@@ -45,6 +45,9 @@
 
 /* USER CODE BEGIN Includes */
 /* Section where include file can be added */
+
+#include "ulp.h"
+
 /* USER CODE END Includes */
 
 /* Ensure definitions are only used by the compiler, and not by the assembler. */
@@ -90,7 +93,7 @@ to exclude the API function. */
 #define INCLUDE_vTaskDelete                  1
 #define INCLUDE_vTaskCleanUpResources        0
 #define INCLUDE_vTaskSuspend                 1
-#define INCLUDE_vTaskDelayUntil              0
+#define INCLUDE_vTaskDelayUntil              1
 #define INCLUDE_vTaskDelay                   1
 #define INCLUDE_xTaskGetSchedulerState       1
 
@@ -152,6 +155,9 @@ standard names. */
   // FreeRTOS doesn't use the SysTick timer nor xPortSysTickHandler() when lptimTick.c is providing the OS tick.
   //
   #undef  xPortSysTickHandler
+
+  #define configPRE_SLEEP_PROCESSING(x)   vUlpPreSleepProcessing()
+  #define configPOST_SLEEP_PROCESSING(x)  vUlpPostSleepProcessing()
 
 #endif // configUSE_TICKLESS_IDLE == 2
 //

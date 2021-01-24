@@ -24,6 +24,8 @@
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
 
+#include "ulp.h"
+
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -108,6 +110,10 @@ int main(void)
   //
   // Integrate lptimTick.c -- End of Block
 
+  //      Initialize Ultra-Low Power support (ULP).
+  //
+  vUlpInit();
+
   /* USER CODE END SysInit */
 
   /* Initialize all configured peripherals */
@@ -115,6 +121,13 @@ int main(void)
   MX_USART2_UART_Init();
   MX_RTC_Init();
   /* USER CODE BEGIN 2 */
+
+  //      Instead of notifying the ULP API that USART2 is now active, just disable USART2.  The application
+  // knows when USART2 is supposed to be active.
+  //
+  // vUlpOnPeripheralsActive(ulpPERIPHERAL_USART2);
+  //
+  HAL_UART_DeInit(&huart2);
 
   /* USER CODE END 2 */
 
@@ -334,9 +347,19 @@ void StartDefaultTask(void const * argument)
 {
   /* USER CODE BEGIN 5 */
   /* Infinite loop */
+  uint32_t tickCount = osKernelSysTick();
   for(;;)
   {
-    osDelay(1);
+    //      Blip the LED for 100ms.
+    //
+    HAL_GPIO_WritePin(LD2_GPIO_Port, LD2_Pin, GPIO_PIN_SET);
+    osDelay(100);
+    HAL_GPIO_WritePin(LD2_GPIO_Port, LD2_Pin, GPIO_PIN_RESET);
+
+    //      Wait until the 5s cycle time elapses.  This delay is long enough to support measurement of our
+    // ultra-low power consumption when there's nothing to do.  (2uA with RTC on a Nucleo L476 in STOP 2.)
+    //
+    osDelayUntil(&tickCount, 5000);
   }
   /* USER CODE END 5 */
 }
