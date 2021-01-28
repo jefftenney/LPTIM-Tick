@@ -12,10 +12,17 @@ void vUlpInit()
    //
    MODIFY_REG(PWR->CR1, PWR_CR1_LPMS_Msk, PWR_CR1_LPMS_STOP2);
 
-   //      Be sure the MCU wakes up from stop mode on the MSI clock, not HSI, because our application uses the
-   // MSI as the core clock.  Might as well give the MCU a head start getting MSI going when waking from STOP.
+   //      Be sure the MCU wakes up from stop mode on the same clock we normally use as the core clock, if
+   // possible.  Might as well give the MCU a head start getting the clock going while waking from STOP.
    //
-   CLEAR_BIT(RCC->CFGR, RCC_CFGR_STOPWUCK);
+   if ( (RCC->CFGR & RCC_CFGR_SWS_Msk) == RCC_CFGR_SWS_HSI )
+   {
+      SET_BIT(RCC->CFGR, RCC_CFGR_STOPWUCK);
+   }
+   else if ( (RCC->CFGR & RCC_CFGR_SWS_Msk) == RCC_CFGR_SWS_MSI )
+   {
+      CLEAR_BIT(RCC->CFGR, RCC_CFGR_STOPWUCK);
+   }
 }
 
 static volatile int xDeepSleepForbiddenFlags = 0;
