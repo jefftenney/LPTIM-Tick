@@ -83,5 +83,10 @@ void vUlpPostSleepProcessing()
       RCC->CFGR = rccCfgrSave;
 
       SCB->SCR &= ~SCB_SCR_SLEEPDEEP_Msk;
+
+      //      This application bypasses the RTC shadow registers, so we don't need to clear the sync flag for
+      // those registers.  They are always out of sync when coming out of deep sleep.
+      //
+      // RTC->ISR &= ~RTC_ISR_RSF;
    }
 }

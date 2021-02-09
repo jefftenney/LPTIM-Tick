@@ -24,6 +24,7 @@
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
 
+#include "testTickTiming.h"
 #include "ulp.h"
 
 /* USER CODE END Includes */
@@ -114,6 +115,26 @@ int main(void)
   //
   vUlpInit();
 
+  #if (configUSE_TICKLESS_IDLE != 2)
+  {
+    //      The tick-timing tests make more accurate evaluations of the tick timing when FreeRTOS has the best
+    // possible value in configCPU_CLOCK_HZ.  Since CubeMX defines that symbol as SystemCoreClock, we update
+    // SystemCoreClock here.  This code helped us "prove" that the MSI PLL behaves like a real PLL (albeit a
+    // very jittery one).  There's "no" tick drift as measured by the RTC when tickless idle is disabled and
+    // the MSI is in PLL mode driving the core clock.
+    //
+    //      We don't care if the HAL reverts this change at some point later during the application execution.
+    // We only want this updated value to endure long enough for FreeRTOS startup code to use it to calculate
+    // the tick timing.
+    //
+    if (RCC->CR & RCC_CR_MSIPLLEN)  // App Specific.  Assumes MSIPLLEN being set means MSI is the core clock!
+    {
+      int pllModeMultiplier = ( SystemCoreClock + (LSE_VALUE/2) ) / LSE_VALUE;
+      SystemCoreClock = LSE_VALUE * pllModeMultiplier;
+    }
+  }
+  #endif
+
   /* USER CODE END SysInit */
 
   /* Initialize all configured peripherals */
@@ -153,7 +174,10 @@ int main(void)
   defaultTaskHandle = osThreadCreate(osThread(defaultTask), NULL);
 
   /* USER CODE BEGIN RTOS_THREADS */
-  /* add threads, ... */
+
+  osThreadDef(tickTest, vTttOsTask, osPriorityAboveNormal, 0, configMINIMAL_STACK_SIZE);
+  osThreadCreate(osThread(tickTest), &hrtc);
+
   /* USER CODE END RTOS_THREADS */
 
   /* Start scheduler */
@@ -188,8 +212,11 @@ void SystemClock_Config(void)
   /** Initializes the RCC Oscillators according to the specified parameters
   * in the RCC_OscInitTypeDef structure.
   */
-  RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_LSE|RCC_OSCILLATORTYPE_MSI;
+  RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_HSI|RCC_OSCILLATORTYPE_LSE
+                              |RCC_OSCILLATORTYPE_MSI;
   RCC_OscInitStruct.LSEState = RCC_LSE_ON;
+  RCC_OscInitStruct.HSIState = RCC_HSI_ON;
+  RCC_OscInitStruct.HSICalibrationValue = RCC_HSICALIBRATION_DEFAULT;
   RCC_OscInitStruct.MSIState = RCC_MSI_ON;
   RCC_OscInitStruct.MSICalibrationValue = 0;
   RCC_OscInitStruct.MSIClockRange = RCC_MSIRANGE_11;
@@ -212,7 +239,7 @@ void SystemClock_Config(void)
     Error_Handler();
   }
   PeriphClkInit.PeriphClockSelection = RCC_PERIPHCLK_RTC|RCC_PERIPHCLK_USART2;
-  PeriphClkInit.Usart2ClockSelection = RCC_USART2CLKSOURCE_PCLK1;
+  PeriphClkInit.Usart2ClockSelection = RCC_USART2CLKSOURCE_HSI;
   PeriphClkInit.RTCClockSelection = RCC_RTCCLKSOURCE_LSE;
   if (HAL_RCCEx_PeriphCLKConfig(&PeriphClkInit) != HAL_OK)
   {

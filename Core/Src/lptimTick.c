@@ -5,7 +5,7 @@
 // Revision: 2020.08.25
 // Tabs: None
 // Columns: 110
-// Compiler: gcc
+// Compiler: gcc (GNU) / armcc (Arm-Keil) / iccarm (IAR)
 // License: MIT
 
 
