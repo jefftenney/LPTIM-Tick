@@ -157,9 +157,11 @@
 // because a key feature of this software is timing accuracy -- no drift in tickless idle.
 //
 #ifdef configTICK_USES_LSI
-#define LPTIMSEL_Val 1 // LSI
+   #define LPTIMSEL_Val 1 // LSI
+   #define IS_REF_CLOCK_READY() (RCC->CSR & RCC_CSR_LSIRDY)
 #else
-#define LPTIMSEL_Val 3 // LSE
+   #define LPTIMSEL_Val 3 // LSE
+   #define IS_REF_CLOCK_READY() (RCC->BDCR & RCC_BDCR_LSERDY)
 #endif
 
 //      Symbol configLPTIM_REF_CLOCK_HZ, optionally defined in FreeRTOSConfig.h, is the frequency of the
@@ -265,6 +267,11 @@ static volatile uint8_t isTickNowSuppressed;    //   This field helps the tick I
 //
 void vPortSetupTimerInterrupt( void )
 {
+   //      Be sure the reference clock is ready.  If this assertion fails, be sure your application code
+   // starts the reference clock (LSE or LSI) prior to starting FreeRTOS.
+   //
+   configASSERT(IS_REF_CLOCK_READY());
+
    //      Enable the APB clock to the LPTIM.  Then select either LSE or LSI as the kernel clock for the
    // LPTIM.  Then be sure the LPTIM "freezes" when the debugger stops program execution.  Then reset the
    // LPTIM just in case it was already in use prior to this function.

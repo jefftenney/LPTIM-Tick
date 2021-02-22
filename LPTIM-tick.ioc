@@ -1,11 +1,15 @@
 #MicroXplorer Configuration settings - do not modify
+FREERTOS.FootprintOK=true
 FREERTOS.INCLUDE_vTaskDelayUntil=1
-FREERTOS.IPParameters=Tasks01,configCHECK_FOR_STACK_OVERFLOW,configUSE_TICKLESS_IDLE,configUSE_MALLOC_FAILED_HOOK,configUSE_TICK_HOOK,INCLUDE_vTaskDelayUntil
-FREERTOS.Tasks01=defaultTask,0,128,StartDefaultTask,Default,NULL,Dynamic,NULL,NULL
+FREERTOS.IPParameters=Tasks01,configCHECK_FOR_STACK_OVERFLOW,configUSE_TICKLESS_IDLE,configUSE_MALLOC_FAILED_HOOK,configUSE_TICK_HOOK,INCLUDE_vTaskDelayUntil,configUSE_TIMERS,configTIMER_TASK_PRIORITY,Timers01,FootprintOK
+FREERTOS.Tasks01=mainTask,0,128,mainOsTask,Default,NULL,Dynamic,NULL,NULL
+FREERTOS.Timers01=ledTimer,ledTimerCallback,osTimerPeriodic,Default,NULL,Dynamic,NULL
 FREERTOS.configCHECK_FOR_STACK_OVERFLOW=2
+FREERTOS.configTIMER_TASK_PRIORITY=6
 FREERTOS.configUSE_MALLOC_FAILED_HOOK=1
 FREERTOS.configUSE_TICKLESS_IDLE=2
 FREERTOS.configUSE_TICK_HOOK=1
+FREERTOS.configUSE_TIMERS=1
 File.Version=6
 GPIO.groupedBy=Group By Peripherals
 KeepUserPlacement=false
@@ -41,6 +45,7 @@ MxCube.Version=6.1.1
 MxDb.Version=DB.6.0.10
 NVIC.BusFault_IRQn=true\:0\:0\:false\:false\:true\:false\:true\:false
 NVIC.DebugMonitor_IRQn=true\:0\:0\:false\:false\:true\:false\:true\:false
+NVIC.EXTI15_10_IRQn=true\:15\:0\:true\:false\:true\:true\:true\:true
 NVIC.ForceEnableDMAVector=true
 NVIC.HardFault_IRQn=true\:0\:0\:false\:false\:true\:false\:true\:false
 NVIC.MemoryManagement_IRQn=true\:0\:0\:false\:false\:true\:false\:true\:false

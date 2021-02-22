@@ -1,4 +1,9 @@
 // Test FreeRTOS Tick Timing on STM32L4 (testTickTiming.c)
+//
+// o Generates a new TttResults_t every tttTEST_DURATION_SECONDS unless disabled.
+// o Disable with vTttSetEvalInterval( portMAX_DELAY );
+// o Task starts in the disable state.
+// o Enable with vTttSetEvalInterval( xIntervalTicks ); where 2 <= xIntervalTicks <= configTICK_RATE_HZ
 
 #include "testTickTiming.h"
 #include "FreeRTOS.h"
@@ -43,7 +48,9 @@ typedef struct
    uint32_t SSR;
 } rtcSnapshotT;
 
-volatile rtcSnapshotT tickHookSnapshot;
+static TaskHandle_t xTttOsTaskHandle;
+static volatile TickType_t xRequestedEvalInterval = portMAX_DELAY;
+static volatile rtcSnapshotT tickHookSnapshot;
 
 static void analyzeTickTiming( const timeStampT* ts, const timeStampT* refTs );
 static void ingestTimePair( const rtcSnapshotT* rtcTime, TickType_t tickCount );
@@ -65,6 +72,8 @@ void vApplicationTickHook( void )
 
 void vTttOsTask( void const * argument )
 {
+   xTttOsTaskHandle = xTaskGetCurrentTaskHandle();
+
    config.hrtc = (RTC_HandleTypeDef*) argument;
    config.subsecondsPerSecond = ( RTC->PRER & RTC_PRER_PREDIV_S ) + 1;
 
@@ -77,55 +86,63 @@ void vTttOsTask( void const * argument )
    //
    HAL_RTCEx_EnableBypassShadow(config.hrtc);
 
-   if (config.evalInterval == 0)
-   {
-      config.evalInterval = pdMS_TO_TICKS(10);
-   }
-
-   rtcSnapshotT rtcTimeAtTick;
-   TickType_t prevWakeTime = xTaskGetTickCount();
+   //      Initialize the notification state for our task to notified so we'll set config.evalInterval.
+   //
+   xTaskNotifyGive(xTttOsTaskHandle);
 
    while (1)
    {
-      vTaskDelayUntil(&prevWakeTime, config.evalInterval);
-
-      //      Capture the most-recent RTC snapshot before another tick comes along and overwrites it.
-      //
-      rtcTimeAtTick = tickHookSnapshot; // structure copy
-
-      //      If we captured the snapshot before we lost it, process it.  Otherwise, count the missed evaluation.
-      //
-      if (xTaskGetTickCount() == prevWakeTime)
+      if (ulTaskNotifyTake(pdTRUE, config.evalInterval) == pdFAIL)
       {
-         ingestTimePair( &rtcTimeAtTick, prevWakeTime );
+         //      Capture an RTC snapshot and its matching tick count.  Remember that tickHookSnapshot changes
+         // asynchronously, in the tick ISR.
+         //
+         TickType_t xTickCount;
+         rtcSnapshotT rtcTimeAtTick;
+         do
+         {
+            xTickCount = xTaskGetTickCount();
+            rtcTimeAtTick = tickHookSnapshot; // structure copy
+
+         } while (xTickCount != xTaskGetTickCount());
+
+         //      Process the snapshot and tick count.
+         //
+         ingestTimePair( &rtcTimeAtTick, xTickCount );
       }
       else
       {
-         testState.evalPeriodsMissed += 1;
+         //      Set the new evaluation interval, and arrange for the next evaluation to be the start of a
+         // new test run (tttTEST_DURATION_SECONDS).
+         //
+         config.evalInterval = xRequestedEvalInterval;
+         testState.syncTime.tickCount = 0;
       }
    }
 }
 
-void vTttGetResults( TttResults_t* lastCompletedCycle, TttResults_t* cycleNowUnderway )
+void vTttGetResults( TttResults_t* lastCompletedRun, TttResults_t* runNowUnderway )
 {
-   cycleNowUnderway->resultsCounter = 0;
+   runNowUnderway->resultsCounter = 0;
 
    taskENTER_CRITICAL();
-   *lastCompletedCycle = prevResults; // structure copy
-   updateResults( cycleNowUnderway );
+   *lastCompletedRun = prevResults; // structure copy
+   updateResults( runNowUnderway );
    taskEXIT_CRITICAL();
 }
 
-void vTttResync()
-{
-   testState.syncTime.tickCount = 0;
-}
 
+// 2 <= interval <= configTICK_RATE_HZ or portMAX_DELAY
 void vTttSetEvalInterval( TickType_t interval )
 {
    if (interval > (TickType_t) 1)
    {
-      config.evalInterval = interval;
+      xRequestedEvalInterval = interval;
+
+      if (xTttOsTaskHandle != NULL)
+      {
+         xTaskNotifyGive(xTttOsTaskHandle);
+      }
    }
 }
 
@@ -154,14 +171,14 @@ static void ingestTimePair( const rtcSnapshotT* rtcTime, TickType_t tickCount )
    {
       analyzeTickTiming(&currentTs, &refTs);
 
-      if (testState.totalTestDuration >= tttCYCLE_DURATION_SECONDS * config.subsecondsPerSecond)
+      if (testState.totalTestDuration >= tttTEST_DURATION_SECONDS * config.subsecondsPerSecond)
       {
          // Save "final" results someplace, and execute the callback function (if any).
          //
          updateResults( &prevResults );
          prevResults.resultsCounter += 1;
 
-         // Start the next test cycle coherently with the end of the previous cycle.
+         // Start the next test run coherently with the end of the previous run.
          //
          syncTo(&currentTs);
       }

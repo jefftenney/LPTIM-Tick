@@ -36,6 +36,8 @@
 
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
+#define NOTIFICATION_FLAG_B1_PIN      (1UL << 0)
+#define NOTIFICATION_FLAG_LED_BLIP    (1UL << 1)
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -48,7 +50,8 @@ RTC_HandleTypeDef hrtc;
 
 UART_HandleTypeDef huart2;
 
-osThreadId defaultTaskHandle;
+osThreadId mainTaskHandle;
+osTimerId ledTimerHandle;
 /* USER CODE BEGIN PV */
 
 /* USER CODE END PV */
@@ -58,7 +61,8 @@ void SystemClock_Config(void);
 static void MX_GPIO_Init(void);
 static void MX_USART2_UART_Init(void);
 static void MX_RTC_Init(void);
-void StartDefaultTask(void const * argument);
+void mainOsTask(void const * argument);
+void ledTimerCallback(void const * argument);
 
 /* USER CODE BEGIN PFP */
 
@@ -66,7 +70,42 @@ void StartDefaultTask(void const * argument);
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
+#define MAX_DEMO_STATE 1
+static void vSetDemoState( int state )
+{
+   uint32_t ledIntervalMs = 0;
+   if (state == 0)
+   {
+      //      Demonstrate minimum energy consumption.  With configUSE_TICKLESS_IDLE == 2 (lptimTick.c), we
+      // draw only 2uA, with RTC, and with FreeRTOS timers/timeouts/delays active.
+      //
+      ledIntervalMs = 5000UL;
+      vTttSetEvalInterval( (TickType_t)configTICK_RATE_HZ );
+   }
+   else if (state == 1)
+   {
+      //      Demonstrate energy consumption waking every 10ms, and test the tick timing.
+      //
+      ledIntervalMs = 2000UL;
+      vTttSetEvalInterval( pdMS_TO_TICKS(10) );
+   }
+#if 0
+   else if (state == 2)
+   {
+      // In state 2 we can add an actor to stress the tick timing
+   }
+#endif
+   else
+   {
+      configASSERT(0);
+   }
 
+   if (ledIntervalMs != 0)
+   {
+      osTimerStart(ledTimerHandle, ledIntervalMs);
+      xTaskNotify(mainTaskHandle, NOTIFICATION_FLAG_LED_BLIP, eSetBits);
+   }
+}
 /* USER CODE END 0 */
 
 /**
@@ -95,10 +134,9 @@ int main(void)
 
   // Integrate lptimTick.c -- Start of Block
   //
-  //      Code in lptimTick.c expects LSE or LSI to be configured and started by
-  // the application code, specific to the hardware.  This code is commented out
-  // because this demo application uses the RTC, so CubeMX already generates the
-  // code we need to start LSE.  See SystemClock_Config().
+  //      Code in lptimTick.c expects LSE or LSI to be configured and started by the application code.  This
+  // RCC code starts the LSE, but it is commented out because this demo application uses the RTC, so CubeMX
+  // already generates the code we need to start LSE.  See SystemClock_Config().
   //
   //  RCC_OscInitTypeDef RCC_OscInitStruct = {0};
   //  RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_LSE;
@@ -127,7 +165,7 @@ int main(void)
     // We only want this updated value to endure long enough for FreeRTOS startup code to use it to calculate
     // the tick timing.
     //
-    if (RCC->CR & RCC_CR_MSIPLLEN)  // App Specific.  Assumes MSIPLLEN being set means MSI is the core clock!
+    if (RCC->CR & RCC_CR_MSIPLLEN)  // App Specific.  Assumes MSIPLLEN being set means MSI is the core clock.
     {
       int pllModeMultiplier = ( SystemCoreClock + (LSE_VALUE/2) ) / LSE_VALUE;
       SystemCoreClock = LSE_VALUE * pllModeMultiplier;
@@ -160,6 +198,11 @@ int main(void)
   /* add semaphores, ... */
   /* USER CODE END RTOS_SEMAPHORES */
 
+  /* Create the timer(s) */
+  /* definition and creation of ledTimer */
+  osTimerDef(ledTimer, ledTimerCallback);
+  ledTimerHandle = osTimerCreate(osTimer(ledTimer), osTimerPeriodic, NULL);
+
   /* USER CODE BEGIN RTOS_TIMERS */
   /* start timers, add new ones, ... */
   /* USER CODE END RTOS_TIMERS */
@@ -169,9 +212,9 @@ int main(void)
   /* USER CODE END RTOS_QUEUES */
 
   /* Create the thread(s) */
-  /* definition and creation of defaultTask */
-  osThreadDef(defaultTask, StartDefaultTask, osPriorityNormal, 0, 128);
-  defaultTaskHandle = osThreadCreate(osThread(defaultTask), NULL);
+  /* definition and creation of mainTask */
+  osThreadDef(mainTask, mainOsTask, osPriorityNormal, 0, 128);
+  mainTaskHandle = osThreadCreate(osThread(mainTask), NULL);
 
   /* USER CODE BEGIN RTOS_THREADS */
 
@@ -357,38 +400,90 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
   HAL_GPIO_Init(LD2_GPIO_Port, &GPIO_InitStruct);
 
+  /* EXTI interrupt init*/
+  HAL_NVIC_SetPriority(EXTI15_10_IRQn, 15, 0);
+  HAL_NVIC_EnableIRQ(EXTI15_10_IRQn);
+
 }
 
 /* USER CODE BEGIN 4 */
 
+void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
+{
+   if (GPIO_Pin == B1_Pin)
+   {
+      //      Don't attempt to notify a task that isn't yet created.  Drop the button press instead.
+      //
+      if ( mainTaskHandle != NULL )
+      {
+         BaseType_t xWasHigherPriorityTaskWoken = pdFALSE;
+         xTaskNotifyFromISR( mainTaskHandle, NOTIFICATION_FLAG_B1_PIN, eSetBits, &xWasHigherPriorityTaskWoken);
+         portYIELD_FROM_ISR(xWasHigherPriorityTaskWoken);
+      }
+   }
+}
 /* USER CODE END 4 */
 
-/* USER CODE BEGIN Header_StartDefaultTask */
+/* USER CODE BEGIN Header_mainOsTask */
 /**
-  * @brief  Function implementing the defaultTask thread.
+  * @brief  Function implementing the mainTask thread.
   * @param  argument: Not used
   * @retval None
   */
-/* USER CODE END Header_StartDefaultTask */
-void StartDefaultTask(void const * argument)
+/* USER CODE END Header_mainOsTask */
+void mainOsTask(void const * argument)
 {
   /* USER CODE BEGIN 5 */
-  /* Infinite loop */
-  uint32_t tickCount = osKernelSysTick();
-  for(;;)
-  {
-    //      Blip the LED for 100ms.
-    //
-    HAL_GPIO_WritePin(LD2_GPIO_Port, LD2_Pin, GPIO_PIN_SET);
-    osDelay(100);
-    HAL_GPIO_WritePin(LD2_GPIO_Port, LD2_Pin, GPIO_PIN_RESET);
 
-    //      Wait until the 5s cycle time elapses.  This delay is long enough to support measurement of our
-    // ultra-low power consumption when there's nothing to do.  (2uA with RTC on a Nucleo L476 in STOP 2.)
-    //
-    osDelayUntil(&tickCount, 5000);
+   int xDemoState = 0;
+   vSetDemoState(xDemoState);
+
+  /* Infinite loop */
+   uint32_t notificationFlags;
+   for(;;)
+   {
+      //      Wait forever for any notification.  In the future we'll have different test modes, driven by
+      // the user button B1.  One will allow the user to measure our ultra-low power consumption, which is
+      // only 2uA, with RTC, on a Nucleo L476 in STOP 2.  Another will stress and validate tick timing.
+      //
+      xTaskNotifyWait(0, UINT32_MAX, &notificationFlags, portMAX_DELAY);
+
+      if (notificationFlags & NOTIFICATION_FLAG_B1_PIN)
+      {
+         if (++xDemoState > MAX_DEMO_STATE )
+         {
+            xDemoState = 0;
+         }
+
+         vSetDemoState(xDemoState);
+      }
+
+      if (notificationFlags & NOTIFICATION_FLAG_LED_BLIP)
+      {
+         //      Blip the LED for 100ms.
+         //
+         HAL_GPIO_WritePin(LD2_GPIO_Port, LD2_Pin, GPIO_PIN_SET);
+         osDelay(100);
+         HAL_GPIO_WritePin(LD2_GPIO_Port, LD2_Pin, GPIO_PIN_RESET);
+      }
   }
   /* USER CODE END 5 */
+}
+
+/* ledTimerCallback function */
+void ledTimerCallback(void const * argument)
+{
+  /* USER CODE BEGIN ledTimerCallback */
+   UNUSED(argument);
+
+   if ( mainTaskHandle != NULL )
+   {
+      BaseType_t xWasHigherPriorityTaskWoken = pdFALSE;
+      xTaskNotifyFromISR( mainTaskHandle, NOTIFICATION_FLAG_LED_BLIP, eSetBits, &xWasHigherPriorityTaskWoken);
+      portYIELD_FROM_ISR(xWasHigherPriorityTaskWoken);
+   }
+
+  /* USER CODE END ledTimerCallback */
 }
 
  /**
