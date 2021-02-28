@@ -24,6 +24,8 @@
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
 
+#include <stdio.h>
+#include <string.h>
 #include "testTickTiming.h"
 #include "ulp.h"
 
@@ -36,8 +38,9 @@
 
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
-#define NOTIFICATION_FLAG_B1_PIN      (1UL << 0)
-#define NOTIFICATION_FLAG_LED_BLIP    (1UL << 1)
+#define NOTIFICATION_FLAG_B1_PIN    (1UL << 0)
+#define NOTIFICATION_FLAG_LED_BLIP  (1UL << 1)
+#define NOTIFICATION_FLAG_RESULTS   (1UL << 2)
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -52,6 +55,7 @@ UART_HandleTypeDef huart2;
 
 osThreadId mainTaskHandle;
 osTimerId ledTimerHandle;
+osTimerId resultsTimerHandle;
 /* USER CODE BEGIN PV */
 
 /* USER CODE END PV */
@@ -63,6 +67,7 @@ static void MX_USART2_UART_Init(void);
 static void MX_RTC_Init(void);
 void mainOsTask(void const * argument);
 void ledTimerCallback(void const * argument);
+void resultsTimerCallback(void const * argument);
 
 /* USER CODE BEGIN PFP */
 
@@ -80,7 +85,8 @@ static void vSetDemoState( int state )
       // draw only 2uA, with RTC, and with FreeRTOS timers/timeouts/delays active.
       //
       ledIntervalMs = 5000UL;
-      vTttSetEvalInterval( (TickType_t)configTICK_RATE_HZ );
+      vTttSetEvalInterval( portMAX_DELAY );
+      osTimerStop(resultsTimerHandle);
    }
    else if (state == 1)
    {
@@ -88,6 +94,7 @@ static void vSetDemoState( int state )
       //
       ledIntervalMs = 2000UL;
       vTttSetEvalInterval( pdMS_TO_TICKS(10) );
+      osTimerStart(resultsTimerHandle, 1000UL);
    }
 #if 0
    else if (state == 2)
@@ -105,6 +112,64 @@ static void vSetDemoState( int state )
       osTimerStart(ledTimerHandle, ledIntervalMs);
       xTaskNotify(mainTaskHandle, NOTIFICATION_FLAG_LED_BLIP, eSetBits);
    }
+}
+
+static int xDescribeTickTestResults(TttResults_t* results, char* dest)
+{
+   int durationSeconds = (results->duration + results->subsecondsPerSecond/2) / results->subsecondsPerSecond;
+   return (sprintf(dest, "Period: %d s, drift: %d/%d s, jump: %+d%% (min), %+d%% (max)",
+                   durationSeconds,
+                   (int)results->drift, (int) results->subsecondsPerSecond,
+                   results->minDriftRatePct,
+                   results->maxDriftRatePct));
+}
+
+static int xUpdateResults()
+{
+   static int resultsCount = 0;
+
+   TttResults_t complete, inProgress;
+   vTttGetResults(&complete, &inProgress);
+
+   //      Build the results text here.  Use a "large" buffer because the results might require two lines of
+   // terminal output.  The buffer is static so its contents remain valid even after we return from this
+   // function.  In turn this allows us to return to our caller without waiting for the UART to finish.
+   //
+   static char textResults[200];
+   static const char* const eraseLine = "\r\x1B[K";
+   int resultsLen = sprintf(textResults, "%s", eraseLine);
+
+   if (resultsCount != complete.resultsCounter)
+   {
+      resultsCount = complete.resultsCounter;
+      resultsLen += xDescribeTickTestResults(&complete, &textResults[resultsLen]);
+      resultsLen += sprintf(&textResults[resultsLen], "\r\n");
+   }
+
+   resultsLen += xDescribeTickTestResults(&inProgress, &textResults[resultsLen]);
+
+   vUlpOnPeripheralsActive(ulpPERIPHERAL_USART2);
+   HAL_UART_Transmit_IT(&huart2, (uint8_t*)textResults, resultsLen);
+
+   int isFailure = pdFALSE;
+   if (inProgress.minDriftRatePct < -2 || inProgress.maxDriftRatePct > 2)
+   {
+      isFailure = pdTRUE;
+   }
+
+   return (isFailure);
+}
+
+void HAL_UART_TxCpltCallback(UART_HandleTypeDef *huart)
+{
+   vUlpOnPeripheralsInactiveFromISR(ulpPERIPHERAL_USART2);
+}
+
+void vBlipLed( uint32_t ms )
+{
+   HAL_GPIO_WritePin(LD2_GPIO_Port, LD2_Pin, GPIO_PIN_SET);
+   osDelay(ms);
+   HAL_GPIO_WritePin(LD2_GPIO_Port, LD2_Pin, GPIO_PIN_RESET);
 }
 /* USER CODE END 0 */
 
@@ -181,12 +246,16 @@ int main(void)
   MX_RTC_Init();
   /* USER CODE BEGIN 2 */
 
-  //      Instead of notifying the ULP API that USART2 is now active, just disable USART2.  The application
-  // knows when USART2 is supposed to be active.
+  //      If the user is currently holding the blue button down, clear DBGMCU->CR.  This step prevents the
+  // debugger from keeping clocks and regulators running when we use a low-power mode.  This in turn allows
+  // the user to observe the "true" impact of low-power modes on current consumption.  Note that the debugger
+  // will lose its connection as soon as we use a low-power mode, but we don't have any choice if we want to
+  // see "true" current consumption.
   //
-  // vUlpOnPeripheralsActive(ulpPERIPHERAL_USART2);
-  //
-  HAL_UART_DeInit(&huart2);
+  if ( HAL_GPIO_ReadPin(B1_GPIO_Port, B1_Pin) == GPIO_PIN_RESET )
+  {
+     DBGMCU->CR = 0; // POR and BOR also clear this register, but not the reset pin, and not other resets.
+  }
 
   /* USER CODE END 2 */
 
@@ -203,6 +272,10 @@ int main(void)
   osTimerDef(ledTimer, ledTimerCallback);
   ledTimerHandle = osTimerCreate(osTimer(ledTimer), osTimerPeriodic, NULL);
 
+  /* definition and creation of resultsTimer */
+  osTimerDef(resultsTimer, resultsTimerCallback);
+  resultsTimerHandle = osTimerCreate(osTimer(resultsTimer), osTimerPeriodic, NULL);
+
   /* USER CODE BEGIN RTOS_TIMERS */
   /* start timers, add new ones, ... */
   /* USER CODE END RTOS_TIMERS */
@@ -213,7 +286,7 @@ int main(void)
 
   /* Create the thread(s) */
   /* definition and creation of mainTask */
-  osThreadDef(mainTask, mainOsTask, osPriorityNormal, 0, 128);
+  osThreadDef(mainTask, mainOsTask, osPriorityNormal, 0, 256);
   mainTaskHandle = osThreadCreate(osThread(mainTask), NULL);
 
   /* USER CODE BEGIN RTOS_THREADS */
@@ -439,6 +512,7 @@ void mainOsTask(void const * argument)
    vSetDemoState(xDemoState);
 
   /* Infinite loop */
+   int isFailureDetected = pdFALSE;
    uint32_t notificationFlags;
    for(;;)
    {
@@ -456,15 +530,31 @@ void mainOsTask(void const * argument)
          }
 
          vSetDemoState(xDemoState);
+
+         isFailureDetected = pdFALSE;
       }
 
       if (notificationFlags & NOTIFICATION_FLAG_LED_BLIP)
       {
-         //      Blip the LED for 100ms.
+         //      Blip the LED for 100ms.  Blip twice if the test has failed.
          //
-         HAL_GPIO_WritePin(LD2_GPIO_Port, LD2_Pin, GPIO_PIN_SET);
-         osDelay(100);
-         HAL_GPIO_WritePin(LD2_GPIO_Port, LD2_Pin, GPIO_PIN_RESET);
+         vBlipLed(100UL);
+         if (isFailureDetected)
+         {
+            osDelay(100UL);
+            vBlipLed(100UL);
+         }
+      }
+
+      if (notificationFlags & NOTIFICATION_FLAG_RESULTS)
+      {
+         //      Make failure detections "sticky" so an observer can rely on the LED even for past failures.
+         // The button clears past failures.
+         //
+         if (xUpdateResults())
+         {
+            isFailureDetected = pdTRUE;
+         }
       }
   }
   /* USER CODE END 5 */
@@ -484,6 +574,22 @@ void ledTimerCallback(void const * argument)
    }
 
   /* USER CODE END ledTimerCallback */
+}
+
+/* resultsTimerCallback function */
+void resultsTimerCallback(void const * argument)
+{
+  /* USER CODE BEGIN resultsTimerCallback */
+   UNUSED(argument);
+
+   if ( mainTaskHandle != NULL )
+   {
+      BaseType_t xWasHigherPriorityTaskWoken = pdFALSE;
+      xTaskNotifyFromISR( mainTaskHandle, NOTIFICATION_FLAG_RESULTS, eSetBits, &xWasHigherPriorityTaskWoken);
+      portYIELD_FROM_ISR(xWasHigherPriorityTaskWoken);
+   }
+
+  /* USER CODE END resultsTimerCallback */
 }
 
  /**

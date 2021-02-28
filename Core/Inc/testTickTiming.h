@@ -19,6 +19,10 @@ void vTttOsTask( void const * argument );
 
 void vApplicationTickHook( void );
 
+#if configUSE_TICK_TEST_COMPLETE_HOOK != 0
+extern void vApplicationTickTestComplete();
+#endif
+
 typedef struct
 {
    uint32_t subsecondsPerSecond;

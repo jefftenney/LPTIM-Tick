@@ -177,6 +177,11 @@ static void ingestTimePair( const rtcSnapshotT* rtcTime, TickType_t tickCount )
          //
          updateResults( &prevResults );
          prevResults.resultsCounter += 1;
+         #if configUSE_TICK_TEST_COMPLETE_HOOK != 0
+         {
+            vApplicationTickTestComplete();
+         }
+         #endif
 
          // Start the next test run coherently with the end of the previous run.
          //
