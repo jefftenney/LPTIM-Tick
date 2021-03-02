@@ -596,6 +596,14 @@ void mainOsTask(void const * argument)
 {
   /* USER CODE BEGIN 5 */
 
+   //      Stop the timer that provides the HAL tick.  Now it won't needlessly interrupt tickless idle periods
+   // that use sleep mode.  (The HAL tick already can't interrupt tickless idle periods that use stop mode,
+   // because the HAL timer doesn't operate in stop mode.)  In a real application, the HAL tick might be
+   // required by the HAL even after FreeRTOS has control.  It's still best to stop the timer here, and then
+   // define HAL_GetTick() and HAL_Delay() to use the FreeRTOS tick (and delay) once available.
+   //
+   TIM17->CR1 &= ~TIM_CR1_CEN;  // wish CubeMX would generate a symbol for the HAL tick timer
+
    taskDISABLE_INTERRUPTS();
    DBGMCU->APB1FZR2 |= DBGMCU_APB1FZR2_DBG_LPTIM2_STOP;
    taskENABLE_INTERRUPTS();
@@ -603,19 +611,18 @@ void mainOsTask(void const * argument)
    int xDemoState = 0;
    vSetDemoState(xDemoState);
 
-  /* Infinite loop */
    int isFailureDetected = pdFALSE;
    uint32_t notificationFlags;
    for(;;)
    {
-      //      Wait forever for any notification.  In the future we'll have different test modes, driven by
-      // the user button B1.  One will allow the user to measure our ultra-low power consumption, which is
-      // only 2uA, with RTC, on a Nucleo L476 in STOP 2.  Another will stress and validate tick timing.
+      //      Wait forever for any notification.
       //
       xTaskNotifyWait(0, UINT32_MAX, &notificationFlags, portMAX_DELAY);
 
       if (notificationFlags & NOTIFICATION_FLAG_B1_PIN)
       {
+         //      Advance the demo state in response to the button press.  Clear any previous test failures.
+         //
          if (++xDemoState > MAX_DEMO_STATE )
          {
             xDemoState = 0;
@@ -629,7 +636,7 @@ void mainOsTask(void const * argument)
       if (notificationFlags & NOTIFICATION_FLAG_RESULTS)
       {
          //      Make failure detections "sticky" so an observer can rely on the LED even for past failures.
-         // The button clears past failures.
+         // We clear past failures when we advance the demo state above (for a button press).
          //
          if (xUpdateResults())
          {

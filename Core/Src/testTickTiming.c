@@ -162,14 +162,13 @@ static void ingestTimePair( const rtcSnapshotT* rtcTime, TickType_t tickCount )
    currentTs.rtcSubseconds = config.subsecondsPerSecond - rtcTime->SSR - 1;
    currentTs.tickCount = tickCount;
 
-   timeStampT refTs = testState.syncTime; // structure copy
-   if (refTs.tickCount == 0)
+   if (testState.syncTime.tickCount == 0)
    {
       syncTo(&currentTs);
    }
    else
    {
-      analyzeTickTiming(&currentTs, &refTs);
+      analyzeTickTiming(&currentTs, &testState.syncTime);
 
       if (testState.totalTestDuration >= tttTEST_DURATION_SECONDS * config.subsecondsPerSecond)
       {

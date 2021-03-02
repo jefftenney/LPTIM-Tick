@@ -188,8 +188,6 @@ standard names. */
   // #define configTICK_INTERRUPT_PRIORITY   (configLIBRARY_LOWEST_INTERRUPT_PRIORITY - 1)
 
 #endif // configUSE_TICKLESS_IDLE == 2
-//
-// Integrate lptimTick.c -- End of Block
 
 /* USER CODE END Defines */
 
