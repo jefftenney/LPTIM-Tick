@@ -161,13 +161,31 @@ standard names. */
   #undef  configTICK_RATE_HZ
   #define configTICK_RATE_HZ  1000UL  // <-- Set FreeRTOS tick rate here, not in CubeMX.
 
-  //      Don't bother installing xPortSysTickHandler() into the vector table or including it in the firmware image at all.
-  // FreeRTOS doesn't use the SysTick timer nor xPortSysTickHandler() when lptimTick.c is providing the OS tick.
+  //      Don't bother installing xPortSysTickHandler() into the vector table or including it in the firmware
+  // image at all.  FreeRTOS doesn't use the SysTick timer nor xPortSysTickHandler() when lptimTick.c is
+  // providing the OS tick.
   //
   #undef  xPortSysTickHandler
 
+#endif // configUSE_TICKLESS_IDLE == 2
+//
+// Integrate lptimTick.c -- End of Block
+
+#if ( configUSE_TICKLESS_IDLE == 2 )
+
+  //      Without pre- and post-sleep processing, lptimTick.c uses only basic sleep mode during tickless idle.
+  // To utilize the stop modes and their dramatic reduction in power consumption, we employ an ultra-low-power
+  // driver to handle the pre- and post-sleep hooks.
+  //
   #define configPRE_SLEEP_PROCESSING(x)   vUlpPreSleepProcessing()
   #define configPOST_SLEEP_PROCESSING(x)  vUlpPostSleepProcessing()
+
+  //      Make sure the self-tests in our demo application capture tick-timing information as quickly as
+  // possible after each tick.  This interrupt priority ensures the OS tick ISR preempts other ISRs.  Without
+  // this configuration, interrupt latency causes a little extra jitter during the stress test.  See main.c.
+  // To see the effect of interrupt latency in the terminal output, remove or comment out this line.
+  //
+  // #define configTICK_INTERRUPT_PRIORITY   (configLIBRARY_LOWEST_INTERRUPT_PRIORITY - 1)
 
 #endif // configUSE_TICKLESS_IDLE == 2
 //

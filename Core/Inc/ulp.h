@@ -7,7 +7,9 @@ void vUlpInit();
 // that cannot operate in STOP 2 mode.
 //
 #define ulpPERIPHERAL_USART2   (1UL << 0)
-#define ulpPERIPHERAL_EXAMPLE  (1UL << 1)
+#define ulpPERIPHERAL_LPTIM2   (1UL << 1)
+
+#define ulpPERIPHERALS_OK_IN_STOP1 (ulpPERIPHERAL_LPTIM2)
 
 void vUlpOnPeripheralsActive( int xPeripherals );
 void vUlpOnPeripheralsActiveFromISR( int xPeripherals );

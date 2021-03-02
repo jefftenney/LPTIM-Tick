@@ -7,11 +7,6 @@
 
 void vUlpInit()
 {
-   //      Select STOP 2 as the stop mode we use whenever we set the SLEEPDEEP bit.  It's the deepest sleep
-   // that doesn't end in reset.
-   //
-   MODIFY_REG(PWR->CR1, PWR_CR1_LPMS_Msk, PWR_CR1_LPMS_STOP2);
-
    //      Be sure the MCU wakes up from stop mode on the same clock we normally use as the core clock, if
    // possible.  Might as well give the MCU a head start getting the clock going while waking from STOP.
    //
@@ -56,12 +51,27 @@ void vUlpOnPeripheralsInactiveFromISR( int xPeripherals )
 }
 
 
+//      Functions vUlpPreSleepProcessing() and vUlpPostSleepProcessing() are called from a critical section,
+// so we happily take a few shortcuts made safe by that usage model.
+//
 static uint32_t rccCfgrSave;
 static uint32_t rccCrSave;
 
 void vUlpPreSleepProcessing()
 {
+   int useDeepSleep = pdFALSE;
    if (xDeepSleepForbiddenFlags == 0)
+   {
+      useDeepSleep = pdTRUE;
+      MODIFY_REG(PWR->CR1, PWR_CR1_LPMS_Msk, PWR_CR1_LPMS_STOP2);
+   }
+   else if ((xDeepSleepForbiddenFlags & ~ulpPERIPHERALS_OK_IN_STOP1) == 0)
+   {
+      useDeepSleep = pdTRUE;
+      MODIFY_REG(PWR->CR1, PWR_CR1_LPMS_Msk, PWR_CR1_LPMS_STOP1);
+   }
+
+   if (useDeepSleep)
    {
       rccCrSave = RCC->CR;
       rccCfgrSave = RCC->CFGR;

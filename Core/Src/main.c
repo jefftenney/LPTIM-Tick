@@ -49,6 +49,8 @@
 /* USER CODE END PM */
 
 /* Private variables ---------------------------------------------------------*/
+LPTIM_HandleTypeDef hlptim2;
+
 RTC_HandleTypeDef hrtc;
 
 UART_HandleTypeDef huart2;
@@ -65,6 +67,7 @@ void SystemClock_Config(void);
 static void MX_GPIO_Init(void);
 static void MX_USART2_UART_Init(void);
 static void MX_RTC_Init(void);
+static void MX_LPTIM2_Init(void);
 void mainOsTask(void const * argument);
 void ledTimerCallback(void const * argument);
 void resultsTimerCallback(void const * argument);
@@ -75,9 +78,17 @@ void resultsTimerCallback(void const * argument);
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
-#define MAX_DEMO_STATE 1
+#define MAX_DEMO_STATE 2
 static void vSetDemoState( int state )
 {
+   //      Assume for now that we're activating a demo state that doesn't need LPTIM2, our stress-test actor.
+   //
+   if (LPTIM2->CR & LPTIM_CR_ENABLE)
+   {
+      HAL_LPTIM_Counter_Stop_IT(&hlptim2);
+      vUlpOnPeripheralsInactive(ulpPERIPHERAL_LPTIM2);
+   }
+
    uint32_t ledIntervalMs = 0;
    if (state == 0)
    {
@@ -90,18 +101,42 @@ static void vSetDemoState( int state )
    }
    else if (state == 1)
    {
+      //      Instruct the tick-timing test to sample the tick timing every 10 milliseconds.  Sampling faster
+      // would require that we open the pass/fail criteria to accomodate a couple hundred microseconds of
+      // jitter or tick "jump" since that criteria is expressed as a percentage of the sampling interval.
+      // Sampling much slower might allow large jitter or "jump" that should be caught as an error, again
+      // because jitter is measured as a percentage of the sampling interval.
+      //
+      #define TICK_TEST_SAMPLING_INTERVAL_MS 10
+
       //      Demonstrate energy consumption waking every 10ms, and test the tick timing.
       //
       ledIntervalMs = 2000UL;
-      vTttSetEvalInterval( pdMS_TO_TICKS(10) );
+      vTttSetEvalInterval( pdMS_TO_TICKS(TICK_TEST_SAMPLING_INTERVAL_MS) );
       osTimerStart(resultsTimerHandle, 1000UL);
    }
-#if 0
    else if (state == 2)
    {
-      // In state 2 we can add an actor to stress the tick timing
+      //      In state 2, add an actor to stress the tick timing.  Use LPTIM2 interrupts since that timer
+      // keeps operating in STOP 1 mode, which allows us to keep demonstrating low-power operation.
+      //
+      //      Carefully select the interval of the nuisance interrupts to be slightly longer than the tick-
+      // test sampling interval.  The sampling interval drives the "expected idle time" in the tickless logic,
+      // so a nuisance interval slightly longer ensures lots of different interrupt timing, including some
+      // tickless periods lasting the full expected idle time.  For example, with a 10ms sampling interval,
+      // there are 327.68 LSE cycles between samplings, on average.  The code below would set up the nuisance
+      // interrupt to be every 328 LSE cycles for that case.  (The value passed to the HAL is 327, but the
+      // period ends up being 328 due to LPTIM reload behavior.)
+      //
+      //      Based on the discussion above, a good long soak test is strongly recommended here.
+      //
+      vUlpOnPeripheralsActive(ulpPERIPHERAL_LPTIM2);
+      HAL_LPTIM_Counter_Start_IT(&hlptim2, (TICK_TEST_SAMPLING_INTERVAL_MS * LSE_VALUE) / 1000U);
+
+      ledIntervalMs = 1000UL;
+      vTttSetEvalInterval( pdMS_TO_TICKS(TICK_TEST_SAMPLING_INTERVAL_MS) );
+      osTimerStart(resultsTimerHandle, 1000UL);
    }
-#endif
    else
    {
       configASSERT(0);
@@ -151,6 +186,8 @@ static int xUpdateResults()
    vUlpOnPeripheralsActive(ulpPERIPHERAL_USART2);
    HAL_UART_Transmit_IT(&huart2, (uint8_t*)textResults, resultsLen);
 
+   //      Apply some pass/fail criteria and report any failures.
+   //
    int isFailure = pdFALSE;
    if (inProgress.minDriftRatePct < -2 || inProgress.maxDriftRatePct > 2)
    {
@@ -244,6 +281,7 @@ int main(void)
   MX_GPIO_Init();
   MX_USART2_UART_Init();
   MX_RTC_Init();
+  MX_LPTIM2_Init();
   /* USER CODE BEGIN 2 */
 
   //      If the user is currently holding the blue button down, clear DBGMCU->CR.  This step prevents the
@@ -354,8 +392,10 @@ void SystemClock_Config(void)
   {
     Error_Handler();
   }
-  PeriphClkInit.PeriphClockSelection = RCC_PERIPHCLK_RTC|RCC_PERIPHCLK_USART2;
+  PeriphClkInit.PeriphClockSelection = RCC_PERIPHCLK_RTC|RCC_PERIPHCLK_USART2
+                              |RCC_PERIPHCLK_LPTIM2;
   PeriphClkInit.Usart2ClockSelection = RCC_USART2CLKSOURCE_HSI;
+  PeriphClkInit.Lptim2ClockSelection = RCC_LPTIM2CLKSOURCE_LSE;
   PeriphClkInit.RTCClockSelection = RCC_RTCCLKSOURCE_LSE;
   if (HAL_RCCEx_PeriphCLKConfig(&PeriphClkInit) != HAL_OK)
   {
@@ -370,6 +410,40 @@ void SystemClock_Config(void)
   /** Enable MSI Auto calibration
   */
   HAL_RCCEx_EnableMSIPLLMode();
+}
+
+/**
+  * @brief LPTIM2 Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_LPTIM2_Init(void)
+{
+
+  /* USER CODE BEGIN LPTIM2_Init 0 */
+
+  /* USER CODE END LPTIM2_Init 0 */
+
+  /* USER CODE BEGIN LPTIM2_Init 1 */
+
+  /* USER CODE END LPTIM2_Init 1 */
+  hlptim2.Instance = LPTIM2;
+  hlptim2.Init.Clock.Source = LPTIM_CLOCKSOURCE_APBCLOCK_LPOSC;
+  hlptim2.Init.Clock.Prescaler = LPTIM_PRESCALER_DIV1;
+  hlptim2.Init.Trigger.Source = LPTIM_TRIGSOURCE_SOFTWARE;
+  hlptim2.Init.OutputPolarity = LPTIM_OUTPUTPOLARITY_HIGH;
+  hlptim2.Init.UpdateMode = LPTIM_UPDATE_IMMEDIATE;
+  hlptim2.Init.CounterSource = LPTIM_COUNTERSOURCE_INTERNAL;
+  hlptim2.Init.Input1Source = LPTIM_INPUT1SOURCE_GPIO;
+  hlptim2.Init.Input2Source = LPTIM_INPUT2SOURCE_GPIO;
+  if (HAL_LPTIM_Init(&hlptim2) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN LPTIM2_Init 2 */
+
+  /* USER CODE END LPTIM2_Init 2 */
+
 }
 
 /**
@@ -495,6 +569,20 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
       }
    }
 }
+
+void HAL_LPTIM_AutoReloadMatchCallback(LPTIM_HandleTypeDef *hlptim)
+{
+   //      The HAL calls this function when LPTIM2 has an ARR match event.  We use LPTIM2 as a stress-test
+   // actor during test state 2.  This function has nothing to do with lptimTick.c or LPTIM1, but it does
+   // help us *test* the tick timing provided by that code and that timer.
+
+   //      Wake the main task, but for no reason.  We're just trying to stress test the tick timing.
+   //
+   BaseType_t xWasHigherPriorityTaskWoken = pdFALSE;
+   xTaskNotifyFromISR( mainTaskHandle, 0, eNoAction, &xWasHigherPriorityTaskWoken);
+   portYIELD_FROM_ISR(xWasHigherPriorityTaskWoken);
+}
+
 /* USER CODE END 4 */
 
 /* USER CODE BEGIN Header_mainOsTask */
@@ -507,6 +595,10 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
 void mainOsTask(void const * argument)
 {
   /* USER CODE BEGIN 5 */
+
+   taskDISABLE_INTERRUPTS();
+   DBGMCU->APB1FZR2 |= DBGMCU_APB1FZR2_DBG_LPTIM2_STOP;
+   taskENABLE_INTERRUPTS();
 
    int xDemoState = 0;
    vSetDemoState(xDemoState);
@@ -534,6 +626,17 @@ void mainOsTask(void const * argument)
          isFailureDetected = pdFALSE;
       }
 
+      if (notificationFlags & NOTIFICATION_FLAG_RESULTS)
+      {
+         //      Make failure detections "sticky" so an observer can rely on the LED even for past failures.
+         // The button clears past failures.
+         //
+         if (xUpdateResults())
+         {
+            isFailureDetected = pdTRUE;
+         }
+      }
+
       if (notificationFlags & NOTIFICATION_FLAG_LED_BLIP)
       {
          //      Blip the LED for 100ms.  Blip twice if the test has failed.
@@ -543,17 +646,6 @@ void mainOsTask(void const * argument)
          {
             osDelay(100UL);
             vBlipLed(100UL);
-         }
-      }
-
-      if (notificationFlags & NOTIFICATION_FLAG_RESULTS)
-      {
-         //      Make failure detections "sticky" so an observer can rely on the LED even for past failures.
-         // The button clears past failures.
-         //
-         if (xUpdateResults())
-         {
-            isFailureDetected = pdTRUE;
          }
       }
   }
