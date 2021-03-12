@@ -102,7 +102,7 @@ static void vSetDemoState( int state )
    else if (state == 1)
    {
       //      Instruct the tick-timing test to sample the tick timing every 10 milliseconds.  Sampling faster
-      // would require that we open the pass/fail criteria to accomodate a couple hundred microseconds of
+      // would require that we open the pass/fail criteria to accommodate a couple hundred microseconds of
       // jitter or tick "jump" since that criteria is expressed as a percentage of the sampling interval.
       // Sampling much slower might allow large jitter or "jump" that should be caught as an error, again
       // because jitter is measured as a percentage of the sampling interval.
@@ -151,10 +151,10 @@ static void vSetDemoState( int state )
 
 static int xDescribeTickTestResults(TttResults_t* results, char* dest)
 {
-   int durationSeconds = (results->duration + results->subsecondsPerSecond/2) / results->subsecondsPerSecond;
+   int durationSeconds = (results->durationSs + results->subsecondsPerSecond/2) / results->subsecondsPerSecond;
    return (sprintf(dest, "Period: %d s, drift: %d/%d s, jump: %+d%% (min), %+d%% (max)",
                    durationSeconds,
-                   (int)results->drift, (int) results->subsecondsPerSecond,
+                   (int)results->driftSs, (int) results->subsecondsPerSecond,
                    results->minDriftRatePct,
                    results->maxDriftRatePct));
 }
@@ -604,10 +604,14 @@ void mainOsTask(void const * argument)
    //
    TIM17->CR1 &= ~TIM_CR1_CEN;  // wish CubeMX would generate a symbol for the HAL tick timer
 
+   //      Be sure LPTIM2 ignores its input clock when the debugger stops program execution.
+   //
    taskDISABLE_INTERRUPTS();
    DBGMCU->APB1FZR2 |= DBGMCU_APB1FZR2_DBG_LPTIM2_STOP;
    taskENABLE_INTERRUPTS();
 
+   //      Start the demo in state 0.
+   //
    int xDemoState = 0;
    vSetDemoState(xDemoState);
 

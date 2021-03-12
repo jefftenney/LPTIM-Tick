@@ -1,5 +1,7 @@
 // Test FreeRTOS Tick Timing on STM32L4 (testTickTiming.h)
 //
+// Uses RTC as reference standard.  Be sure to configure and start the RTC prior to starting vTttOsTask().
+//
 // o Generates a new TttResults_t every tttTEST_DURATION_SECONDS unless disabled.
 // o Disable with vTttSetEvalInterval( portMAX_DELAY );
 // o Task starts in the disable state.
@@ -27,8 +29,8 @@ typedef struct
 {
    uint32_t subsecondsPerSecond;
 
-   int32_t  drift;
-   uint32_t duration;
+   int32_t  driftSs;
+   uint32_t durationSs;
 
    int16_t  minDriftRatePct;
    int16_t  maxDriftRatePct;

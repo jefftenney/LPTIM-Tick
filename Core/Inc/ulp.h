@@ -1,4 +1,6 @@
 // Ultra Low Power API (ulp.h)
+//
+// Automatically use STOP modes in FreeRTOS whenever application conditions permit.
 
 void vUlpInit();
 
@@ -9,6 +11,8 @@ void vUlpInit();
 #define ulpPERIPHERAL_USART2   (1UL << 0)
 #define ulpPERIPHERAL_LPTIM2   (1UL << 1)
 
+//      Identify the subset of the peripherals listed above that can operate in STOP 1 mode.
+//
 #define ulpPERIPHERALS_OK_IN_STOP1 (ulpPERIPHERAL_LPTIM2)
 
 void vUlpOnPeripheralsActive( int xPeripherals );

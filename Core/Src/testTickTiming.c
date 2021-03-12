@@ -29,15 +29,12 @@ static struct
    int16_t  minDriftRatePct;
    int16_t  maxDriftRatePct;
 
-   int evalPeriodsMissed;
 } testState;
 
 static struct
 {
    RTC_HandleTypeDef* hrtc;
-
    TickType_t evalInterval;
-
    uint32_t subsecondsPerSecond;
 
 } config;
@@ -46,6 +43,7 @@ typedef struct
 {
    uint32_t TR;
    uint32_t SSR;
+
 } rtcSnapshotT;
 
 static TaskHandle_t xTttOsTaskHandle;
@@ -63,6 +61,14 @@ static void syncTo( const timeStampT* ts );
 
 void vApplicationTickHook( void )
 {
+   //      FreeRTOS calls vApplicationTickHook() from the tick interrupt handler, so this a great time to
+   // capture the current RTC time including subseconds.  Code in the tick-timing task analyzes these captures
+   // occasionally to evaluate tick-timing accuracy.
+   //
+   //      Be careful to capture a coherent time from the RTC.  The RTC provides shadow registers to alleviate
+   // the need for this kind of careful coding, but we don't use the shadow registers.  They are out of sync
+   // after STOP mode, and we don't want to wait around for them to sync up.
+   //
    do
    {
       tickHookSnapshot.SSR = RTC->SSR;
@@ -72,16 +78,28 @@ void vApplicationTickHook( void )
 
 void vTttOsTask( void const * argument )
 {
+   //      Save a copy of our task handle so our API functions can use task notifications easily.
+   //
    xTttOsTaskHandle = xTaskGetCurrentTaskHandle();
 
+   //      Save the RTC handle and relevant RTC configuration info to our configuration structure.
+   //
    config.hrtc = (RTC_HandleTypeDef*) argument;
    config.subsecondsPerSecond = ( RTC->PRER & RTC_PRER_PREDIV_S ) + 1;
 
+   //      Verify bare minimum configuration of the RTC to provide timing resolution at least 4x the tick
+   // frequency.  This software would work correctly with less resolution, but the testing wouldn't be as
+   // useful.  If this assertion fails, decrease PREDIV_A and increase PREDIV_S in your RTC configuration.
+   //
+   configASSERT(config.subsecondsPerSecond / configTICK_RATE_HZ >= 4UL)
+
+   //      Be sure the RTC ignores its input clock when the debugger stops program execution.
+   //
    taskDISABLE_INTERRUPTS();
    DBGMCU->APB1FZR1 |= DBGMCU_APB1FZR1_DBG_RTC_STOP;
    taskENABLE_INTERRUPTS();
 
-   //      Coming out of stop mode, the RTC shadow registers won't be up-to-date.  So when we read the RTC,
+   //      Coming out of stop mode, the RTC shadow registers aren't up-to-date.  So when we read the RTC,
    // bypass the shadow registers.  We manually ensure coherency between the various RTC fields.
    //
    HAL_RTCEx_EnableBypassShadow(config.hrtc);
@@ -123,8 +141,15 @@ void vTttOsTask( void const * argument )
 
 void vTttGetResults( TttResults_t* lastCompletedRun, TttResults_t* runNowUnderway )
 {
+   //      The "results" for the run now underway are incomplete, so set the results counter to zero for the
+   // caller's benefit.
+   //
    runNowUnderway->resultsCounter = 0;
 
+   //      Use a critical section to retrieve test results.  This function executes in a task context other
+   // than the tick-timing task context, and we don't want the results to change in the middle of our
+   // retrieving them.
+   //
    taskENTER_CRITICAL();
    *lastCompletedRun = prevResults; // structure copy
    updateResults( runNowUnderway );
@@ -172,10 +197,16 @@ static void ingestTimePair( const rtcSnapshotT* rtcTime, TickType_t tickCount )
 
       if (testState.totalTestDuration >= tttTEST_DURATION_SECONDS * config.subsecondsPerSecond)
       {
-         // Save "final" results someplace, and execute the callback function (if any).
+         //      Save the "final" results.  Use a critical section to prevent another task from reading the
+         // test results while we're in the middle of updating them.  See vTttGetResults().
          //
+         taskENTER_CRITICAL();
          updateResults( &prevResults );
          prevResults.resultsCounter += 1;
+         taskEXIT_CRITICAL();
+
+         //      Execute the callback function (if any).
+         //
          #if configUSE_TICK_TEST_COMPLETE_HOOK != 0
          {
             vApplicationTickTestComplete();
@@ -191,10 +222,11 @@ static void ingestTimePair( const rtcSnapshotT* rtcTime, TickType_t tickCount )
 
 static void syncTo( const timeStampT* ts )
 {
+   //      Set a new synchronization time, and reset the test state to the beginning of a new test run.
+   //
    testState.syncTime = *ts; // structure copy
    testState.maxDriftRatePct = -100;
    testState.minDriftRatePct = +100;
-   testState.evalPeriodsMissed = 0;
    testState.totalDrift = 0;
    testState.totalTestDuration = 0;
 }
@@ -251,8 +283,8 @@ static void analyzeTickTiming( const timeStampT* ts, const timeStampT* refTs )
 
 static void updateResults( TttResults_t* results )
 {
-   results->drift = testState.totalDrift;
-   results->duration = testState.totalTestDuration;
+   results->driftSs = testState.totalDrift;
+   results->durationSs = testState.totalTestDuration;
    results->maxDriftRatePct = testState.maxDriftRatePct;
    results->minDriftRatePct = testState.minDriftRatePct;
    results->subsecondsPerSecond = config.subsecondsPerSecond;
