@@ -7,6 +7,24 @@
 
 void vUlpInit()
 {
+   #ifdef configMIN_RUN_BETWEEN_DEEP_SLEEPS    // Errata workaround
+   {
+      //      Set the SysTick "load" register (or reload-value register) to support the errata workaround.
+      //
+      //      The SysTick timer uses a 24-bit counting register.  The longest minimum-run time is 15us
+      // according to the errata sheet.  A 24-bit value (up to 16.7M) is more than sufficient for 15us,
+      // no matter the core clock rate.
+      //
+      configASSERT( configMIN_RUN_BETWEEN_DEEP_SLEEPS <= 0x00FFFFFFU &&
+                    configMIN_RUN_BETWEEN_DEEP_SLEEPS != 0 );
+      SysTick->LOAD = configMIN_RUN_BETWEEN_DEEP_SLEEPS;
+
+      //      Be sure SysTick uses the lowest interrupt priority.
+      //
+      NVIC_SetPriority(SysTick_IRQn, configLIBRARY_LOWEST_INTERRUPT_PRIORITY);
+   }
+   #endif
+
    //      Be sure the MCU wakes up from stop mode on the same clock we normally use as the core clock, if
    // possible.  Might as well give the MCU a head start getting the clock going while waking from STOP.
    //
@@ -84,6 +102,22 @@ void vUlpPostSleepProcessing()
 {
    if (SCB->SCR & SCB_SCR_SLEEPDEEP_Msk)
    {
+      #ifdef configMIN_RUN_BETWEEN_DEEP_SLEEPS    // Errata workaround
+      {
+         //     Start a new SysTick timer period.  We won't attempt to enter STOP mode until the timer period
+         // ends.  Note that we do start a new period here unnecessarily if the CPU didn't actually enter stop
+         // mode (due to a pending interrupt).  That's OK.
+         //
+         SysTick->VAL = 0;
+         SysTick->CTRL = SysTick_CTRL_CLKSOURCE_Msk | SysTick_CTRL_ENABLE_Msk | SysTick_CTRL_TICKINT_Msk;
+
+         //      Mark the "min-run" peripheral as being now in use so that we won't attempt STOP mode until
+         // it's no longer in use.  See SysTick_Handler() below.
+         //
+         xDeepSleepForbiddenFlags |= ulpPERIPHERAL_MIN_RUN;
+      }
+      #endif
+
       //      We may have been in deep sleep.  If we were, the hardware cleared several enable bits in the CR,
       // and it changed the selected system clock in CFGR.  Restore them now.  If we're restarting the PLL as
       // the CPU clock here, the CPU will not wait for it.  Instead, the CPU continues executing from the
@@ -100,3 +134,16 @@ void vUlpPostSleepProcessing()
       // RTC->ISR &= ~RTC_ISR_RSF;
    }
 }
+
+#ifdef configMIN_RUN_BETWEEN_DEEP_SLEEPS    // Errata workaround
+   //      When the SysTick timer expires, we allow STOP mode again.
+   //
+   void SysTick_Handler()
+   {
+      //      Stop the SysTick timer.  We use it in "one-shot" mode to know when it's safe to use STOP mode
+      // again.  Then mark our "min-run" peripheral as no longer in use.
+      //
+      SysTick->CTRL = 0;
+      vUlpOnPeripheralsInactiveFromISR( ulpPERIPHERAL_MIN_RUN );
+   }
+#endif

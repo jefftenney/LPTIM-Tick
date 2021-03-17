@@ -187,6 +187,14 @@ standard names. */
   //
   // #define configTICK_INTERRUPT_PRIORITY   (configLIBRARY_LOWEST_INTERRUPT_PRIORITY - 1)
 
+  //      The Nucleo board gives us Vdd=3.3V, so we need only 2us minimum run time to work around erratum
+  // 2.3.21.  Note that when we define this symbol, code in ulp.c owns the SysTick timer.  At the moment, our
+  // demo application doesn't have any relevant ISRs short enough to violate this minimum run time, so we
+  // don't enable the work around.  (The shortest possible run time between deep sleeps occurs with a very
+  // short ISR that interrupts STOP mode but doesn't interact with FreeRTOS at all.  See lptimTick.c.)
+  //
+  // #define configMIN_RUN_BETWEEN_DEEP_SLEEPS  ( ( 2U * configCPU_CLOCK_HZ ) / 1000000 )
+
 #endif // configUSE_TICKLESS_IDLE == 2
 
 /* USER CODE END Defines */
