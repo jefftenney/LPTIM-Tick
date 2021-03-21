@@ -102,6 +102,15 @@ void HAL_LPTIM_MspInit(LPTIM_HandleTypeDef* hlptim)
   /* USER CODE END LPTIM2_MspInit 1 */
   }
 
+  /* ## - 1 - Enable LPTIM clock ############################################ */
+  __HAL_RCC_LPTIM1_CLK_ENABLE();
+  
+  /* ## - 2 - Force & Release the LPTIM Periheral Clock Reset ############### */  
+  /* Force the LPTIM Periheral Clock Reset */
+  __HAL_RCC_LPTIM1_FORCE_RESET();
+  
+  /* Release the LPTIM Periheral Clock Reset */  
+  __HAL_RCC_LPTIM1_RELEASE_RESET();
 }
 
 /**

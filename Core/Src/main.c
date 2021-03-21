@@ -234,23 +234,6 @@ int main(void)
 
   /* USER CODE BEGIN SysInit */
 
-  // Integrate lptimTick.c -- Start of Block
-  //
-  //      Code in lptimTick.c expects LSE or LSI to be configured and started by the application code.  This
-  // RCC code starts the LSE, but it is commented out because this demo application uses the RTC, so CubeMX
-  // already generates the code we need to start LSE.  See SystemClock_Config().
-  //
-  //  RCC_OscInitTypeDef RCC_OscInitStruct = {0};
-  //  RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_LSE;
-  //  RCC_OscInitStruct.LSEState = RCC_LSE_ON;
-  //  RCC_OscInitStruct.PLL.PLLState = RCC_PLL_NONE;
-  //  if (HAL_RCC_OscConfig(&RCC_OscInitStruct) != HAL_OK)
-  //  {
-  //    Error_Handler();
-  //  }
-  //
-  // Integrate lptimTick.c -- End of Block
-
   //      Initialize Ultra-Low Power support (ULP).
   //
   vUlpInit();
@@ -570,19 +553,6 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
    }
 }
 
-void HAL_LPTIM_AutoReloadMatchCallback(LPTIM_HandleTypeDef *hlptim)
-{
-   //      The HAL calls this function when LPTIM2 has an ARR match event.  We use LPTIM2 as a stress-test
-   // actor during test state 2.  This function has nothing to do with lptimTick.c or LPTIM1, but it does
-   // help us *test* the tick timing provided by that code and that timer.
-
-   //      Wake the main task, but for no reason.  We're just trying to stress test the tick timing.
-   //
-   BaseType_t xWasHigherPriorityTaskWoken = pdFALSE;
-   xTaskNotifyFromISR( mainTaskHandle, 0, eNoAction, &xWasHigherPriorityTaskWoken);
-   portYIELD_FROM_ISR(xWasHigherPriorityTaskWoken);
-}
-
 /* USER CODE END 4 */
 
 /* USER CODE BEGIN Header_mainOsTask */
@@ -595,14 +565,6 @@ void HAL_LPTIM_AutoReloadMatchCallback(LPTIM_HandleTypeDef *hlptim)
 void mainOsTask(void const * argument)
 {
   /* USER CODE BEGIN 5 */
-
-   //      Stop the timer that provides the HAL tick.  Now it won't needlessly interrupt tickless idle periods
-   // that use sleep mode.  (The HAL tick already can't interrupt tickless idle periods that use stop mode,
-   // because the HAL timer doesn't operate in stop mode.)  In a real application, the HAL tick might be
-   // required by the HAL even after FreeRTOS has control.  It's still best to stop the timer here, and then
-   // define HAL_GetTick() and HAL_Delay() to use the FreeRTOS tick (and delay) once available.
-   //
-   TIM17->CR1 &= ~TIM_CR1_CEN;  // wish CubeMX would generate a symbol for the HAL tick timer
 
    //      Be sure LPTIM2 ignores its input clock when the debugger stops program execution.
    //

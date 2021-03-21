@@ -151,26 +151,6 @@ standard names. */
 /* USER CODE BEGIN Defines */
 /* Section where parameter definitions can be added (for instance, to override default ones in FreeRTOS.h) */
 
-// Integrate lptimTick.c -- Start of Block
-//
-#if ( configUSE_TICKLESS_IDLE == 2 )
-
-  //      Preprocessor code in lptimTick.c requires that configTICK_RATE_HZ be a preprocessor-friendly numeric
-  // literal.  As a result, the application *ignores* the CubeMX configuration of the FreeRTOS tick rate.
-  //
-  #undef  configTICK_RATE_HZ
-  #define configTICK_RATE_HZ  1000UL  // <-- Set FreeRTOS tick rate here, not in CubeMX.
-
-  //      Don't bother installing xPortSysTickHandler() into the vector table or including it in the firmware
-  // image at all.  FreeRTOS doesn't use the SysTick timer nor xPortSysTickHandler() when lptimTick.c is
-  // providing the OS tick.
-  //
-  #undef  xPortSysTickHandler
-
-#endif // configUSE_TICKLESS_IDLE == 2
-//
-// Integrate lptimTick.c -- End of Block
-
 #if ( configUSE_TICKLESS_IDLE == 2 )
 
   //      Without pre- and post-sleep processing, lptimTick.c uses only basic sleep mode during tickless idle.
