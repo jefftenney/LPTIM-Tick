@@ -234,23 +234,6 @@ int main(void)
 
   /* USER CODE BEGIN SysInit */
 
-  // Integrate lptimTick.c -- Start of Block
-  //
-  //      Code in lptimTick.c expects LSE or LSI to be configured and started by the application code.  This
-  // RCC code starts the LSE, but it is commented out because this demo application uses the RTC, so CubeMX
-  // already generates the code we need to start LSE.  See SystemClock_Config().
-  //
-  //  RCC_OscInitTypeDef RCC_OscInitStruct = {0};
-  //  RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_LSE;
-  //  RCC_OscInitStruct.LSEState = RCC_LSE_ON;
-  //  RCC_OscInitStruct.PLL.PLLState = RCC_PLL_NONE;
-  //  if (HAL_RCC_OscConfig(&RCC_OscInitStruct) != HAL_OK)
-  //  {
-  //    Error_Handler();
-  //  }
-  //
-  // Integrate lptimTick.c -- End of Block
-
   //      Initialize Ultra-Low Power support (ULP).
   //
   vUlpInit();
