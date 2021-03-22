@@ -26,7 +26,7 @@
  *  
  *----------------------------------------------------------------------------
  *
- * Portions Copyright © 2016 STMicroelectronics International N.V. All rights reserved.
+ * Portions Copyright ï¿½ 2016 STMicroelectronics International N.V. All rights reserved.
  * Portions Copyright (c) 2013 ARM LIMITED
  * All rights reserved.
  * Redistribution and use in source and binary forms, with or without
@@ -507,12 +507,12 @@ int32_t osSignalSet (osThreadId thread_id, int32_t signal)
   
   if (inHandlerMode())
   {
-    if(xTaskGenericNotifyFromISR( thread_id , (uint32_t)signal, eSetBits, &ulPreviousNotificationValue, &xHigherPriorityTaskWoken ) != pdPASS )
+    if(xTaskGenericNotifyFromISR( thread_id , 0, (uint32_t)signal, eSetBits, &ulPreviousNotificationValue, &xHigherPriorityTaskWoken ) != pdPASS )
       return 0x80000000;
     
     portYIELD_FROM_ISR( xHigherPriorityTaskWoken );
   }  
-  else if(xTaskGenericNotify( thread_id , (uint32_t)signal, eSetBits, &ulPreviousNotificationValue) != pdPASS )
+  else if(xTaskGenericNotify( thread_id , 0, (uint32_t)signal, eSetBits, &ulPreviousNotificationValue) != pdPASS )
     return 0x80000000;
   
   return ulPreviousNotificationValue;
