@@ -27,6 +27,7 @@
 #include <stdio.h>
 #include <string.h>
 #include "testTickTiming.h"
+#include "TimerDemo.h"
 #include "ulp.h"
 
 /* USER CODE END Includes */
@@ -98,6 +99,20 @@ static void vSetDemoState( int state )
       ledIntervalMs = 5000UL;
       vTttSetEvalInterval( portMAX_DELAY );
       osTimerStop(resultsTimerHandle);
+
+      #if (configINCLUDE_TIMER_DEMO == 1)
+      {
+         //      The timer demo offers so-called backlog tests that test boundary cases that can occur only
+         // when the timer task is backlogged.  The backlog tests are disruptive because they artificially
+         // induce a backlog by calling xTaskCatchUpTicks().  In our case, the backlog tests affect our own
+         // tick-timing demo states 1 and 2 because xTaskCatchUpTicks() causes xTickCount to diverge from RTC
+         // time -- precisely the divergence states 1 and 2 are testing for.  So we enable the backlog tests
+         // here in state 0 but not in states 1 and 2.
+         //
+         vTimerDemoIncludeBacklogTests( pdTRUE );
+      }
+      #endif
+
    }
    else if (state == 1)
    {
@@ -114,6 +129,16 @@ static void vSetDemoState( int state )
       ledIntervalMs = 2000UL;
       vTttSetEvalInterval( pdMS_TO_TICKS(TICK_TEST_SAMPLING_INTERVAL_MS) );
       osTimerStart(resultsTimerHandle, 1000UL);
+
+      #if (configINCLUDE_TIMER_DEMO == 1)
+      {
+         //      See notes above regarding call to vTimerDemoIncludeBacklogTests().  To verify that tick-
+         // timing tests can detect the timing discrepancy created by the backlog tests, change pdFALSE to
+         // pdTRUE below.
+         //
+         vTimerDemoIncludeBacklogTests( pdFALSE );
+      }
+      #endif
    }
    else if (state == 2)
    {
@@ -136,6 +161,16 @@ static void vSetDemoState( int state )
       ledIntervalMs = 1000UL;
       vTttSetEvalInterval( pdMS_TO_TICKS(TICK_TEST_SAMPLING_INTERVAL_MS) );
       osTimerStart(resultsTimerHandle, 1000UL);
+
+      #if (configINCLUDE_TIMER_DEMO == 1)
+      {
+         //      See notes above regarding call to vTimerDemoIncludeBacklogTests().  To verify that tick-
+         // timing tests can detect the timing discrepancy created by the backlog tests, change pdFALSE to
+         // pdTRUE below.
+         //
+         vTimerDemoIncludeBacklogTests( pdFALSE );
+      }
+      #endif
    }
    else
    {
@@ -331,6 +366,12 @@ int main(void)
 
   osThreadDef(tickTest, vTttOsTask, osPriorityAboveNormal, 0, configMINIMAL_STACK_SIZE);
   osThreadCreate(osThread(tickTest), &hrtc);
+
+  #if (configINCLUDE_TIMER_DEMO == 1)
+  {
+    vStartTimerDemoTask( (TickType_t)50 );
+  }
+  #endif
 
   /* USER CODE END RTOS_THREADS */
 

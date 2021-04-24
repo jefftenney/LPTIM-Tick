@@ -8,6 +8,7 @@
 #include "testTickTiming.h"
 #include "FreeRTOS.h"
 #include "task.h"
+#include "TimerDemo.h"
 #include "stm32l4xx_hal.h"
 
 TttResults_t prevResults;
@@ -74,6 +75,12 @@ void vApplicationTickHook( void )
       tickHookSnapshot.SSR = RTC->SSR;
       tickHookSnapshot.TR = RTC->TR;
    } while (tickHookSnapshot.SSR != RTC->SSR);
+
+   //      The timer demo's periodic ISR testing is not compatible with tickless idle.
+   //
+#if (configINCLUDE_TIMER_DEMO == 1 && configUSE_TICKLESS_IDLE == 0)
+   vTimerPeriodicISRTests();
+#endif
 }
 
 void vTttOsTask( void const * argument )

@@ -71,7 +71,7 @@
 #define configTICK_RATE_HZ                       ((TickType_t)1000)
 #define configMAX_PRIORITIES                     ( 7 )
 #define configMINIMAL_STACK_SIZE                 ((uint16_t)128)
-#define configTOTAL_HEAP_SIZE                    ((size_t)3000)
+#define configTOTAL_HEAP_SIZE                    ((size_t)6000)
 #define configMAX_TASK_NAME_LEN                  ( 16 )
 #define configUSE_16_BIT_TICKS                   0
 #define configUSE_MUTEXES                        1
@@ -79,7 +79,7 @@
 #define configCHECK_FOR_STACK_OVERFLOW           2
 #define configUSE_MALLOC_FAILED_HOOK             1
 #define configUSE_PORT_OPTIMISED_TASK_SELECTION  1
-#define configUSE_TICKLESS_IDLE                  1
+#define configUSE_TICKLESS_IDLE                  0
 /* USER CODE BEGIN MESSAGE_BUFFER_LENGTH_TYPE */
 /* Defaults to size_t for backward compatibility, but can be changed
    if lengths will always be less than the number of bytes in a size_t. */
@@ -196,6 +196,12 @@ standard names. */
   // #define configMIN_RUN_BETWEEN_DEEP_SLEEPS  ( ( 2U * configCPU_CLOCK_HZ ) / 1000000 )
 
 #endif // configUSE_TICKLESS_IDLE == 2
+
+  //      Note that the timer demo from FreeRTOS is slightly crippled by tickless idle -- tickless idle
+  // precludes our use of vTimerPeriodicISRTests().  If you want to get the full timer demo including the
+  // periodic timer tests from ISRs, disable tickless idle.
+  //
+  #define configINCLUDE_TIMER_DEMO 1
 
 /* USER CODE END Defines */
 
