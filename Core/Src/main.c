@@ -633,9 +633,7 @@ void ledTimerCallback(void const * argument)
 
    if ( mainTaskHandle != NULL )
    {
-      BaseType_t xWasHigherPriorityTaskWoken = pdFALSE;
-      xTaskNotifyFromISR( mainTaskHandle, NOTIFICATION_FLAG_LED_BLIP, eSetBits, &xWasHigherPriorityTaskWoken);
-      portYIELD_FROM_ISR(xWasHigherPriorityTaskWoken);
+      xTaskNotify( mainTaskHandle, NOTIFICATION_FLAG_LED_BLIP, eSetBits );
    }
 
   /* USER CODE END ledTimerCallback */
@@ -649,9 +647,7 @@ void resultsTimerCallback(void const * argument)
 
    if ( mainTaskHandle != NULL )
    {
-      BaseType_t xWasHigherPriorityTaskWoken = pdFALSE;
-      xTaskNotifyFromISR( mainTaskHandle, NOTIFICATION_FLAG_RESULTS, eSetBits, &xWasHigherPriorityTaskWoken);
-      portYIELD_FROM_ISR(xWasHigherPriorityTaskWoken);
+      xTaskNotify( mainTaskHandle, NOTIFICATION_FLAG_RESULTS, eSetBits );
    }
 
   /* USER CODE END resultsTimerCallback */
