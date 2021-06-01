@@ -2,11 +2,11 @@
 //
 // STM32 No-Drift FreeRTOS Tick/Tickless via LPTIM
 //
-// Revision: 2020.08.25
+// Revision: 2021.06.01
 // Tabs: None
 // Columns: 110
 // Compiler: gcc (GNU) / armcc (Arm-Keil) / iccarm (IAR)
-// License: MIT
+// SPDX-License-Identifier: MIT
 
 
 // Copyright 2020 Jeff Tenney <jeff.tenney@gmail.com>
@@ -37,16 +37,15 @@
 //
 //      The resulting FreeRTOS port:
 //
-//   o Allows use of low-power stop modes during tickless idle.
+//   o Allows use of low-power stop modes during tickless idle, while still keeping kernel time.
 //   o Eliminates kernel-time drift associated with tickless idle in official FreeRTOS port
 //   o Eliminates kernel-time drift caused by rounding the OS tick to a whole number of timer counts.
 //   o Avoids drift and errors found in other LPTIM implementations available from ST or the public domain.
 //   o Detects/reports ticks dropped due to the application masking interrupts (the tick ISR) for too long.
-//   o Is easily adaptable to add ppm steering to correct frequency error in the oscillator (LSE/LSI).
 //
 //      This software is currently adapted for STM32L4(+) but is easily adaptable to (or already compatible
-// with) any STM32 that provides an LPTIM peripheral, including most STM32L models, some STM32F models,
-// STM32G, STM32H, and STM32W.
+// with) any STM32 that provides an LPTIM peripheral, such as STM32L, STM32F, STM32G, STM32H, STM32W, and the
+// new STM32U.
 
 
 // Terminology
@@ -223,12 +222,11 @@ static uint32_t ulTimerCountsForOneTick;        //   A "baseline" tick has this 
                                                 // tick.
 
    static volatile int runningSubcountError;    //   This error accumulator never exceeds half a count, or
-                                                // configTICK_RATE_HZ/2, unless ppm steering is in use, and
-                                                // then it never exceeds a whole count, or configTICK_RATE_HZ.
-                                                // When this field is negative, the next tick is slightly
-                                                // late; when this field is positive, the next tick is
-                                                // slightly early.  This field allows us to schedule each tick
-                                                // on the timer count closest to the ideal tick time.
+                                                // configTICK_RATE_HZ/2.  When this field is negative, the
+                                                // next tick is slightly late; when this field is positive,
+                                                // the next tick is slightly early.  This field allows us to
+                                                // schedule each tick on the timer count closest to the ideal
+                                                // tick time.
 #endif // configLPTIM_ENABLE_PRECISION
 
 static volatile uint16_t idealCmp;              //   This field doubles as a write cache for LPTIM->CMP and a
@@ -267,11 +265,6 @@ static volatile uint8_t isTickNowSuppressed;    //   This field helps the tick I
 //
 void vPortSetupTimerInterrupt( void )
 {
-   //      Be sure the reference clock is ready.  If this assertion fails, be sure your application code
-   // starts the reference clock (LSE or LSI) prior to starting FreeRTOS.
-   //
-   configASSERT(IS_REF_CLOCK_READY());
-
    //      Enable the APB clock to the LPTIM.  Then select either LSE or LSI as the kernel clock for the
    // LPTIM.  Then be sure the LPTIM "freezes" when the debugger stops program execution.  Then reset the
    // LPTIM just in case it was already in use prior to this function.
@@ -284,6 +277,23 @@ void vPortSetupTimerInterrupt( void )
    DBGMCU->APB1FZR1 |= DBGMCU_APB1FZR1_DBG_LPTIM1_STOP;
    RCC->APB1RSTR1 |= RCC_APB1RSTR1_LPTIM1RST;   // Reset the LPTIM module per erratum 2.14.1.
    RCC->APB1RSTR1 &= ~RCC_APB1RSTR1_LPTIM1RST;
+   #ifdef STM32WL   // <-- "Family" symbol is defined in the ST device header file, e.g., "stm32wlxx.h".
+   {
+      #define EXTI_IMR1_LPTIM1   (1UL << 29)
+      #define EXTI_IMR1_LPTIM2   (1UL << 30)
+      #define EXTI_IMR1_LPTIM3   (1UL << 31)
+
+      //      Users of STM32WL must also change this next statement to match their LPTIM instance selection.
+      // By default these MCU's disable wake-up from deep sleep via LPTIM.  An oversight by ST?
+      //
+      EXTI->IMR1 |= EXTI_IMR1_LPTIM1;
+   }
+   #endif
+
+   //      Be sure the reference clock is ready.  If this assertion fails, be sure your application code
+   // starts the reference clock (LSE or LSI) prior to starting FreeRTOS.
+   //
+   configASSERT(IS_REF_CLOCK_READY());
 
    //      Calculate the constants required to configure the tick interrupt.
    //
@@ -435,13 +445,13 @@ void vPortSuppressTicksAndSleep( TickType_t xExpectedIdleTime )
 
       //      Because our implementation uses an interrupt handler to process a successful write to CMP, we
       // use a loop here so we won't return to our caller merely for that interrupt.  Nor will we return for a
-      // tick ISR that rejects the tick as described above, nor for any other ISR that doesn't request a
-      // context switch.  And don't worry about ISRs changing how long the OS expects to be idle; FreeRTOS
+      // tick ISR that rejects the tick as described above, nor for any other ISR that doesn't make a task
+      // ready to execute.  And don't worry about ISRs changing how long the OS expects to be idle; FreeRTOS
       // doesn't let ISRs do that -- not even the xTimerXyzFromISR() functions.  Those functions merely queue
-      // jobs for the timer task, which from our perspective is a requested context switch.
+      // jobs for the timer task, which from our perspective is a task now ready to execute.
       //
-      //      Stay in the loop until an ISR requests a context switch or until the timer reaches the end of
-      // the sleep period.  We identify the end of the sleep period by recognizing that the tick ISR has
+      //      Stay in the loop until an ISR makes a task ready to execute or until the timer reaches the end
+      // of the sleep period.  We identify the end of the sleep period by recognizing that the tick ISR has
       // modified idealCmp for the next tick after the sleep period ends.
       //
       do
@@ -561,9 +571,6 @@ void vPortSuppressTicksAndSleep( TickType_t xExpectedIdleTime )
                   // very next timer count, even before that count occurs, instead scheduling the subsequent
                   // tick.  With a slow timer, the timer might *still* not have made that count as we arrive
                   // here again.  Correct fullTicksLeft for that case here.
-                  //
-                  //      This correction is also useful if ppm corrections are active and we are using
-                  // "alternate" duration ticks for more than just correcting for rounding error in the math.
                   //
                   fullTicksLeft = xExpectedIdleTime - 1UL;
                }
@@ -781,56 +788,5 @@ void LPTIM_IRQHandler( void )
       }
    }
 }
-
-
-#if 0 // ( configLPTIM_ENABLE_PRECISION != 0 )  (** UNFINISHED CODE **)
-//============================================================================================================
-// vPortCorrectFreqError()
-//
-// PPM Steering - Used to correct frequency error in LSE/LSI (** UNFINISHED CODE **)
-//
-//      To correct for frequency error in the reference clock, we could periodically add/subtract half a count
-// to runningSubcountError.  We leave this unfinished code here as an indication of just how easy it would be.
-//
-//      Typical 32kHz "tuning-fork" crystals operate in a 150ppm window over temperature, with the fastest
-// frequency around 25 degrees C.  A "poor" frequency accuracy at 25 degrees would be +/-100ppm, so our ppm
-// tuning must tolerate -250ppm to +100ppm.  At -250ppm, we have half a count correction every 2000 counts.
-// That means there isn't much error in rounding ulTimerCountsPerSteeringEvent and not keeping track of
-// subcounts.  Even at -500ppm, it's not worth worrying over; instead of correcting for -500ppm, we might
-// correct for -500.1 ppm.  No big deal.
-//
-//      An application using this feature could update the ppm periodically, presumably in response to
-// temperature changes.  Since the RTC on modern STM32 MCUs allows ppm steering, most applications would have
-// no need for this feature.
-
-static uint32_t ulTimerCountsPerSteeringEvent;
-static int      isPpmNegative;
-
-void vPortCorrectFreqError( int ppm )  // designed for -250...+100; OK up to +/- 500000 with reduced accuracy.
-{
-   if (ppm == 0)
-   {
-      //      Instruct the ppm-steering system to stand down.
-      //
-      ulTimerCountsPerSteeringEvent = 0;
-   }
-   else
-   {
-      //      Help the ppm-steering system decide whether each steering event should *add* or *subtract* half
-      // a clock count.
-      //
-      isPpmNegative = (ppm < 0);
-
-      //      If a steering event adds/subtracts one timer count, then we need |ppm| steering events every
-      // 1M+ppm counts.  But we want our steering events to correct by half a timer count so we don't ever
-      // accidentally induce a correction of two counts when combined with the standard tick-width modulating.
-      // So we need twice as many steering events since each event corrects only half a count.
-      //
-      int countsToTreatAs1Million = 1000000L + ppm;
-      if (isPpmNegative) ppm = -ppm;
-      ulTimerCountsPerSteeringEvent = (countsToTreatAs1Million + ppm) / (2*ppm); // round the number of counts
-   }
-}
-#endif // if 0  (configLPTIM_ENABLE_PRECISION)
 
 #endif  // configUSE_TICKLESS_IDLE == 2
