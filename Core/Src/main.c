@@ -227,6 +227,10 @@ int main(void)
 
   /* USER CODE BEGIN Init */
 
+  //      Compensate for a CubeMX omission in HAL_InitTick() in stm32l4xx_hal_timebase_tim.c.
+  //
+  uwTickPrio = TICK_INT_PRIORITY;
+
   /* USER CODE END Init */
 
   /* Configure the system clock */
