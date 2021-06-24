@@ -78,7 +78,10 @@ void resultsTimerCallback(void const * argument);
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
-#define MAX_DEMO_STATE 2
+#define DEMO_STATE_TEST_1  0
+#define DEMO_STATE_TEST_2  1
+#define DEMO_STATE_TEST_3  2
+#define MAX_DEMO_STATE     DEMO_STATE_TEST_3
 static void vSetDemoState( int state )
 {
    //      Assume for now that we're activating a demo state that doesn't need LPTIM2, our stress-test actor.
@@ -90,7 +93,7 @@ static void vSetDemoState( int state )
    }
 
    uint32_t ledIntervalMs = 0;
-   if (state == 0)
+   if (state == DEMO_STATE_TEST_1)
    {
       //      Demonstrate minimum energy consumption.  With configUSE_TICKLESS_IDLE == 2 (lptimTick.c), we
       // draw only 2uA, with RTC, and with FreeRTOS timers/timeouts/delays active.
@@ -99,7 +102,7 @@ static void vSetDemoState( int state )
       vTttSetEvalInterval( portMAX_DELAY );
       osTimerStop(resultsTimerHandle);
    }
-   else if (state == 1)
+   else if (state == DEMO_STATE_TEST_2)
    {
       //      Instruct the tick-timing test to sample the tick timing every 10 milliseconds.  Sampling faster
       // would require that we open the pass/fail criteria to accommodate a couple hundred microseconds of
@@ -115,7 +118,7 @@ static void vSetDemoState( int state )
       vTttSetEvalInterval( pdMS_TO_TICKS(TICK_TEST_SAMPLING_INTERVAL_MS) );
       osTimerStart(resultsTimerHandle, 1000UL);
    }
-   else if (state == 2)
+   else if (state == DEMO_STATE_TEST_3)
    {
       //      In state 2, add an actor to stress the tick timing.  Use LPTIM2 interrupts since that timer
       // keeps operating in STOP 1 mode, which allows us to keep demonstrating low-power operation.
@@ -183,12 +186,12 @@ static int xUpdateResults( int xDemoState )
 
    resultsLen += xDescribeTickTestResults(&inProgress, &textResults[resultsLen]);
 
-   //      Send the results to the terminal.  In demo state 2, use interrupt-driven I/O with the terminal as
+   //      Send the results to the terminal.  In test 3, use interrupt-driven I/O with the terminal as
    // a way to enhance the stress test.  The interrupts induce a rapid sequence of early wake-ups from
    // tickless idle (if enabled).  This barrage of early wake-ups is a great stress test for the tickless
    // logic.  In the other demo states, use busy-wait I/O to avoid adding a test actor when we don't want one.
    //
-   if (xDemoState == 2)
+   if (xDemoState == DEMO_STATE_TEST_3)
    {
       vUlpOnPeripheralsActive(ulpPERIPHERAL_USART2);
       HAL_UART_Transmit_IT(&huart2, (uint8_t*)textResults, resultsLen);
@@ -633,7 +636,7 @@ void mainOsTask(void const * argument)
 
    //      Start the demo in state 0.
    //
-   int xDemoState = 0;
+   int xDemoState = DEMO_STATE_TEST_1;
    vSetDemoState(xDemoState);
 
    int isFailureDetected = pdFALSE;
@@ -650,7 +653,7 @@ void mainOsTask(void const * argument)
          //
          if (++xDemoState > MAX_DEMO_STATE )
          {
-            xDemoState = 0;
+            xDemoState = DEMO_STATE_TEST_1;
          }
 
          vSetDemoState(xDemoState);
