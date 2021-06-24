@@ -151,20 +151,21 @@ static void vSetDemoState( int state )
       xTaskNotify(mainTaskHandle, NOTIFICATION_FLAG_LED_BLIP, eSetBits);
    }
 
-   char textResults[100];
-   int len = sprintf(textResults, "\r\n\r\nRunning Test %d.", state + 1);
+   char banner[100];
+   int len = sprintf(banner, "\r\n\r\nRunning Test %d.", state + 1);
    if (state != DEMO_STATE_TEST_1)
    {
-      len += sprintf(&textResults[len], "  Jumps are shown as %% of %d ms.\r\n",
+      len += sprintf(&banner[len], "  Jumps are shown as %% of %d ms.\r\n",
                      TICK_TEST_SAMPLING_INTERVAL_MS);
    }
-   HAL_UART_Transmit(&huart2, (uint8_t*)textResults, len, HAL_MAX_DELAY);
+   HAL_UART_Transmit(&huart2, (uint8_t*)banner, len, HAL_MAX_DELAY);
 }
 
-static int xDescribeTickTestResults(TttResults_t* results, char* dest)
+static int xDescribeTickTestResults(TttResults_t* results, int periodNumber, char* dest)
 {
    int durationSeconds = (results->durationSs + results->subsecondsPerSecond/2) / results->subsecondsPerSecond;
-   return (sprintf(dest, "Period: %d s, drift: %d/%d s, jump: %+d%% (min), %+d%% (max)",
+   return (sprintf(dest, "Period %d: %d s, drift: %d/%d s, jump: %+d%% (min), %+d%% (max)",
+                   periodNumber,
                    durationSeconds,
                    (int)results->driftSs, (int) results->subsecondsPerSecond,
                    results->minDriftRatePct,
@@ -189,11 +190,14 @@ static int xUpdateResults( int xDemoState )
    if (resultsCount != complete.resultsCounter)
    {
       resultsCount = complete.resultsCounter;
-      resultsLen += xDescribeTickTestResults(&complete, &textResults[resultsLen]);
-      resultsLen += sprintf(&textResults[resultsLen], "\r\n");
+      if (resultsCount != 0)
+      {
+         resultsLen += xDescribeTickTestResults(&complete, resultsCount, &textResults[resultsLen]);
+         resultsLen += sprintf(&textResults[resultsLen], "\r\n");
+      }
    }
 
-   resultsLen += xDescribeTickTestResults(&inProgress, &textResults[resultsLen]);
+   resultsLen += xDescribeTickTestResults(&inProgress, resultsCount + 1, &textResults[resultsLen]);
 
    //      Send the results to the terminal.  In test 3, use interrupt-driven I/O with the terminal as
    // a way to enhance the stress test.  The interrupts induce a rapid sequence of early wake-ups from
