@@ -150,6 +150,15 @@ static void vSetDemoState( int state )
       osTimerStart(ledTimerHandle, ledIntervalMs);
       xTaskNotify(mainTaskHandle, NOTIFICATION_FLAG_LED_BLIP, eSetBits);
    }
+
+   char textResults[100];
+   int len = sprintf(textResults, "\r\n\r\nRunning Test %d.", state + 1);
+   if (state != DEMO_STATE_TEST_1)
+   {
+      len += sprintf(&textResults[len], "  Jumps are shown as %% of %d ms.\r\n",
+                     TICK_TEST_SAMPLING_INTERVAL_MS);
+   }
+   HAL_UART_Transmit(&huart2, (uint8_t*)textResults, len, HAL_MAX_DELAY);
 }
 
 static int xDescribeTickTestResults(TttResults_t* results, char* dest)
