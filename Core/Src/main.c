@@ -159,7 +159,7 @@ static int xDescribeTickTestResults(TttResults_t* results, char* dest)
                    results->maxDriftRatePct));
 }
 
-static int xUpdateResults()
+static int xUpdateResults( int xDemoState )
 {
    static int resultsCount = 0;
 
@@ -183,8 +183,25 @@ static int xUpdateResults()
 
    resultsLen += xDescribeTickTestResults(&inProgress, &textResults[resultsLen]);
 
-   vUlpOnPeripheralsActive(ulpPERIPHERAL_USART2);
-   HAL_UART_Transmit_IT(&huart2, (uint8_t*)textResults, resultsLen);
+   //      Send the results to the terminal.  In demo state 2, use interrupt-driven I/O with the terminal as
+   // a way to enhance the stress test.  The interrupts induce a rapid sequence of early wake-ups from
+   // tickless idle (if enabled).  This barrage of early wake-ups is a great stress test for the tickless
+   // logic.  In the other demo states, use busy-wait I/O to avoid adding a test actor when we don't want one.
+   //
+   if (xDemoState == 2)
+   {
+      vUlpOnPeripheralsActive(ulpPERIPHERAL_USART2);
+      HAL_UART_Transmit_IT(&huart2, (uint8_t*)textResults, resultsLen);
+   }
+   else
+   {
+      //      Because busy-wait I/O keeps this task "ready", it also prevents tickless idle, so we don't need
+      // to bother notifying the ULP driver that the UART peripheral is active.
+      //
+      // vUlpOnPeripheralsActive(ulpPERIPHERAL_USART2);
+      HAL_UART_Transmit(&huart2, (uint8_t*)textResults, resultsLen, HAL_MAX_DELAY);
+      // vUlpOnPeripheralsInactive(ulpPERIPHERAL_USART2);
+   }
 
    //      Apply some pass/fail criteria and report any failures.
    //
@@ -646,7 +663,7 @@ void mainOsTask(void const * argument)
          //      Make failure detections "sticky" so an observer can rely on the LED even for past failures.
          // We clear past failures when we advance the demo state above (for a button press).
          //
-         if (xUpdateResults())
+         if (xUpdateResults( xDemoState ))
          {
             isFailureDetected = pdTRUE;
          }
