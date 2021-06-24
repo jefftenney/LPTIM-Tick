@@ -1,2 +1,5 @@
 # Auto detect text files and perform LF normalization
 * text=auto
+
+# Tell linguist that our .h files are "C" (not C++)
+*.h linguist-language=C
