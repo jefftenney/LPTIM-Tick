@@ -197,6 +197,7 @@ static void ingestTimePair( const rtcSnapshotT* rtcTime, TickType_t tickCount )
    if (testState.syncTime.tickCount == 0)
    {
       syncTo(&currentTs);
+      prevResults.resultsCounter = 0;
    }
    else
    {
