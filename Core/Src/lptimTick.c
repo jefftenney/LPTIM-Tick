@@ -2,14 +2,14 @@
 //
 // STM32 No-Drift FreeRTOS Tick/Tickless via LPTIM
 //
-// Revision: 2021.06.01
+// Revision: 2021.08.11
 // Tabs: None
 // Columns: 110
 // Compiler: gcc (GNU) / armcc (Arm-Keil) / iccarm (IAR)
 // SPDX-License-Identifier: MIT
 
 
-// Copyright 2020 Jeff Tenney <jeff.tenney@gmail.com>
+// Copyright 2021 Jeff Tenney <jeff.tenney@gmail.com>
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy of this software and
 // associated documentation files (the "Software"), to deal in the Software without restriction, including
@@ -212,7 +212,7 @@ static uint32_t ulTimerCountsForOneTick;        //   A "baseline" tick has this 
 
 #if ( configLPTIM_ENABLE_PRECISION != 0 )
 
-   static int xTimerSubcountErrorPerTick;       //   A "baseline" tick has this much error, measured in timer
+   static int lSubcountErrorPerTick;            //   A "baseline" tick has this much error, measured in timer
                                                 // subcounts.  There are configTICK_RATE_HZ subcounts per
                                                 // count.  When this field is negative, the baseline tick is a
                                                 // little too long because we rounded "up" to the nearest
@@ -221,7 +221,7 @@ static uint32_t ulTimerCountsForOneTick;        //   A "baseline" tick has this 
                                                 // we rounded "down" to the nearest whole number of counts per
                                                 // tick.
 
-   static volatile int runningSubcountError;    //   This error accumulator never exceeds half a count, or
+   static volatile int lRunningSubcountError;   //   This error accumulator never exceeds half a count, or
                                                 // configTICK_RATE_HZ/2.  When this field is negative, the
                                                 // next tick is slightly late; when this field is positive,
                                                 // the next tick is slightly early.  This field allows us to
@@ -229,7 +229,7 @@ static uint32_t ulTimerCountsForOneTick;        //   A "baseline" tick has this 
                                                 // tick time.
 #endif // configLPTIM_ENABLE_PRECISION
 
-static volatile uint16_t idealCmp;              //   This field doubles as a write cache for LPTIM->CMP and a
+static volatile uint16_t usIdealCmp;            //   This field doubles as a write cache for LPTIM->CMP and a
                                                 // way to remember that we set CMP to 0 because 0xFFFF isn't
                                                 // allowed (hardware limitation).
 
@@ -237,8 +237,8 @@ static volatile uint8_t isCmpWriteInProgress;   //   This field helps us remembe
                                                 // CMP write to finish.  We must not write to CMP while a
                                                 // previous write is still in progress.
 
-static volatile uint8_t isTickNowSuppressed;    //   This field helps the tick ISR determine whether idealCmp
-                                                // is in the past or the future.
+static volatile uint8_t isTickNowSuppressed;    //   This field helps the tick ISR determine whether
+                                                // usIdealCmp is in the past or the future.
 
 
 // LPTIM Instance Selection
@@ -315,7 +315,7 @@ void vPortSetupTimerInterrupt( void )
       xMaximumSuppressedTicks = 65536UL * configTICK_RATE_HZ / LPTIM_CLOCK_HZ - 1 - 1;
 
       //      For convenience, the code above rounded *up* if the ideal number of counts per tick is exactly
-      // X.5.  So we might calculate xTimerSubcountErrorPerTick to be -(configTICK_RATE_HZ/2) but never
+      // X.5.  So we might calculate lSubcountErrorPerTick to be -(configTICK_RATE_HZ/2) but never
       // +(configTICK_RATE_HZ/2).  If you get a build error on this line, be sure configTICK_RATE_HZ is a
       // simple numeric literal (eg, 1000UL) with no C typecasting (eg, (TickType_t)1000).
       //
@@ -325,8 +325,8 @@ void vPortSetupTimerInterrupt( void )
          #define IS_SUBCOUNT_EPT_POSITIVE 0
       #endif
 
-      xTimerSubcountErrorPerTick = LPTIM_CLOCK_HZ - ( ulTimerCountsForOneTick * configTICK_RATE_HZ );
-      configASSERT( xTimerSubcountErrorPerTick != configTICK_RATE_HZ / 2 );
+      lSubcountErrorPerTick = LPTIM_CLOCK_HZ - ( ulTimerCountsForOneTick * configTICK_RATE_HZ );
+      configASSERT( lSubcountErrorPerTick != configTICK_RATE_HZ / 2 );
    }
    #endif // configLPTIM_ENABLE_PRECISION
 
@@ -339,10 +339,10 @@ void vPortSetupTimerInterrupt( void )
    LPTIM->ARR = 0xFFFF;        // timer period = ARR + 1.  Modify this register only when LPTIM is enabled.
    LPTIM->CMP = ulTimerCountsForOneTick;                // Modify this register only when LPTIM is enabled.
    isCmpWriteInProgress = pdTRUE;
-   idealCmp = ulTimerCountsForOneTick;
+   usIdealCmp = ulTimerCountsForOneTick;
    #if ( configLPTIM_ENABLE_PRECISION != 0 )
    {
-      runningSubcountError = xTimerSubcountErrorPerTick;
+      lRunningSubcountError = lSubcountErrorPerTick;
    }
    #endif // configLPTIM_ENABLE_PRECISION
    LPTIM->CR |= LPTIM_CR_CNTSTRT;
@@ -378,10 +378,10 @@ void vPortSuppressTicksAndSleep( TickType_t xExpectedIdleTime )
    // register more than xMaximumSuppressedTicks (in timer counts) from the *current* CNT value.
    //
    #if ( configLPTIM_ENABLE_PRECISION != 0 )
-      uint32_t extraCounts = (xExpectedIdleTime - 1UL) * LPTIM_CLOCK_HZ / configTICK_RATE_HZ;
-      int extraError = (xExpectedIdleTime - 1UL) * LPTIM_CLOCK_HZ % configTICK_RATE_HZ;
+      uint32_t ulExtraCounts = (xExpectedIdleTime - 1UL) * LPTIM_CLOCK_HZ / configTICK_RATE_HZ;
+      int32_t lExtraError = (xExpectedIdleTime - 1UL) * LPTIM_CLOCK_HZ % configTICK_RATE_HZ;
    #else
-      uint32_t extraCounts = (xExpectedIdleTime - 1UL) * ulTimerCountsForOneTick;
+      uint32_t ulExtraCounts = (xExpectedIdleTime - 1UL) * ulTimerCountsForOneTick;
    #endif // configLPTIM_ENABLE_PRECISION
 
    //      Enter a critical section so we can safely check the sleep-mode status.  But don't use
@@ -390,8 +390,7 @@ void vPortSuppressTicksAndSleep( TickType_t xExpectedIdleTime )
    // wakes us up from sleep.
    //
    __disable_irq();
-   __DSB();
-   __ISB();
+   // __ISB() is not needed here.  The CPSID instruction used by  __disable_irq() is self synchronizing.
 
    //      If a context switch is pending or a task is waiting for the scheduler to be unsuspended, then
    // abandon the low power entry and the critical section.  This status cannot change while interrupts are
@@ -405,22 +404,22 @@ void vPortSuppressTicksAndSleep( TickType_t xExpectedIdleTime )
    {
       #if ( configLPTIM_ENABLE_PRECISION != 0 )
       {
-         //      Adjust extraCounts if needed to maintain proper alignment.  We left extraError positive above
-         // instead of minimizing its absolute value, so we don't need to check the final value of
-         // runningSubcountError for being too negative.
+         //      Adjust ulExtraCounts if needed to maintain proper alignment.  We left lExtraError positive
+         // above instead of minimizing its absolute value, so we don't need to check the final value of
+         // lRunningSubcountError for being too negative.
          //
-         runningSubcountError += extraError;
-         if (runningSubcountError > (int)(configTICK_RATE_HZ/2))
+         lRunningSubcountError += lExtraError;
+         if (lRunningSubcountError > (int)(configTICK_RATE_HZ/2))
          {
-            extraCounts++;
-            runningSubcountError -= configTICK_RATE_HZ;
+            ulExtraCounts++;
+            lRunningSubcountError -= configTICK_RATE_HZ;
          }
       }
       #endif // configLPTIM_ENABLE_PRECISION
 
-      //      Before we suppress the tick by modifying idealCmp (and eventually CMP), make a note that the
+      //      Before we suppress the tick by modifying usIdealCmp (and eventually CMP), make a note that the
       // tick is now suppressed.  The order isn't actually important because we're in a critical section.  The
-      // tick ISR uses this field to help it determine whether idealCmp is in the past or in the future.
+      // tick ISR uses this field to help it determine whether usIdealCmp is in the past or in the future.
       //
       //     Our design relies on the tick interrupt having high enough priority that other ISRs can't delay
       // the tick ISR too much while isTickNowSuppressed is true.  Too much delay would cause the ISR to
@@ -435,13 +434,13 @@ void vPortSuppressTicksAndSleep( TickType_t xExpectedIdleTime )
       // before the new value takes effect (any time after we mask interrupts above), the tick ISR rejects it
       // as a tick when we unmask interrupts below.
       //
-      idealCmp += extraCounts;  // (idealCmp is a uint16_t)
+      usIdealCmp += ulExtraCounts;  // (usIdealCmp is a uint16_t)
       if (!isCmpWriteInProgress)
       {
          isCmpWriteInProgress = pdTRUE;
-         LPTIM->CMP = idealCmp == 0xFFFF ? 0 : idealCmp;  // never write 0xFFFF to CMP (HW rule)
+         LPTIM->CMP = usIdealCmp == 0xFFFF ? 0 : usIdealCmp;  // never write 0xFFFF to CMP (HW rule)
       }
-      uint32_t expectedEndCmp = idealCmp;
+      uint32_t ulExpectedEndCmp = usIdealCmp;
 
       //      Because our implementation uses an interrupt handler to process a successful write to CMP, we
       // use a loop here so we won't return to our caller merely for that interrupt.  Nor will we return for a
@@ -452,7 +451,7 @@ void vPortSuppressTicksAndSleep( TickType_t xExpectedIdleTime )
       //
       //      Stay in the loop until an ISR makes a task ready to execute or until the timer reaches the end
       // of the sleep period.  We identify the end of the sleep period by recognizing that the tick ISR has
-      // modified idealCmp for the next tick after the sleep period ends.
+      // modified usIdealCmp for the next tick after the sleep period ends.
       //
       do
       {
@@ -476,7 +475,6 @@ void vPortSuppressTicksAndSleep( TickType_t xExpectedIdleTime )
             //
             __DSB();
             __WFI();
-            __ISB();
          }
          configPOST_SLEEP_PROCESSING( (const TickType_t)xExpectedIdleTime );
 
@@ -484,17 +482,15 @@ void vPortSuppressTicksAndSleep( TickType_t xExpectedIdleTime )
          // of sleep mode.
          //
          __enable_irq();
-         __DSB();
-         __ISB();
+         __ISB();  // ISB is recommended by ARM; not strictly needed in Cortex-M when __disable_irq() is next.
 
          //      Disable interrupts for our call to eTaskConfirmSleepModeStatus() and in case we iterate again
          // in the loop.
          //
          __disable_irq();
-         __DSB();
-         __ISB();
+         // __ISB() is not needed here.  The CPSID instruction used by  __disable_irq() is self synchronizing.
 
-      } while (idealCmp == expectedEndCmp && eTaskConfirmSleepModeStatus() != eAbortSleep);
+      } while (usIdealCmp == ulExpectedEndCmp && eTaskConfirmSleepModeStatus() != eAbortSleep);
 
       //      Re-enable interrupts.  We try our best to support short ISR latency, especially for interrupt
       // priorities higher than configMAX_SYSCALL_INTERRUPT_PRIORITY.
@@ -509,16 +505,16 @@ void vPortSuppressTicksAndSleep( TickType_t xExpectedIdleTime )
       // added one tick (well, actually the ISR "pended" the increment because the scheduler is currently
       // suspended, but it's all the same to us), so we use "- 1" here.
       //
-      uint32_t ulCompleteTickPeriods = xExpectedIdleTime - 1UL;
+      TickType_t xCompleteTickPeriods = xExpectedIdleTime - (TickType_t)1;
 
       //      We identify that we reached the end of the expected idle time by noting that the tick ISR has
-      // modified idealCmp.  So if it hasn't, then we probably have to reschedule the next tick as described
-      // above.  We temporarily mask the tick interrupt while we make the assessment and manipulate idealCmp
+      // modified usIdealCmp.  So if it hasn't, then we probably have to reschedule the next tick as described
+      // above.  We temporarily mask the tick interrupt while we make the assessment and manipulate usIdealCmp
       // (and CMP) if necessary.  We also mask any interrupts at or below its interrupt priority since those
       // interrupts are allowed to use consecutive execution time enough to cause us to miss ticks.
       //
       portDISABLE_INTERRUPTS();
-      if (idealCmp == expectedEndCmp)
+      if (usIdealCmp == ulExpectedEndCmp)
       {
          //      Something else woke us up.  See how many timer counts we still had left, and then use that
          // number to determine how many OS ticks actually elapsed.  Then reschedule the next tick exactly
@@ -527,8 +523,8 @@ void vPortSuppressTicksAndSleep( TickType_t xExpectedIdleTime )
          //      Get a coherent copy of the current count value in the timer.  The CNT register is clocked
          // asynchronously, so we keep reading it until we get the same value during a verification read.
          //
-         uint32_t currCount;
-         do currCount = LPTIM->CNT; while (currCount != LPTIM->CNT);
+         uint32_t ulCurrCount;
+         do ulCurrCount = LPTIM->CNT; while (ulCurrCount != LPTIM->CNT);
 
          //      See how many timer counts we still had left, but don't include the timer count currently
          // underway.  If a tick happens to align with the beginning of the timer count currently underway, we
@@ -537,83 +533,84 @@ void vPortSuppressTicksAndSleep( TickType_t xExpectedIdleTime )
          // idle task disabled the scheduler and called this function.  We don't want to reschedule *that*
          // interrupt.
          //
-         //      Several conditions can cause fullCountsLeft to be "negative" here, meaning that we actually
+         //      Several conditions can cause ulFullCountsLeft to be "negative" here, meaning that we actually
          // have reached the end of the expected idle time and now merely need to allow the ISR to execute.
-         // First, CNT may have incremented after we masked interrupts but before we captured currCount.
-         // Second, LPTIM generates the CMPM IRQ one count *after* the match event.  Third, when idealCmp is
+         // First, CNT may have incremented after we masked interrupts but before we captured ulCurrCount.
+         // Second, LPTIM generates the CMPM IRQ one count *after* the match event.  Third, when usIdealCmp is
          // 0xFFFF, we set CMP to 0x0000, which when combined with the first two cases, could easily leave
          // countsLeft set to -3 (65533).  And finally, interrupts with priority above
-         // configMAX_SYSCALL_INTERRUPT_PRIORITY can delay our capture of currCount.  That delay is limited
-         // to less than one tick duration by stated requirement.  No need to do anything if fullCountsLeft is
-         // "negative".  In fact there's no need to do anything if fullCountsLeft is less than a whole tick,
-         // but fullTicksLeft (below) determines that.
+         // configMAX_SYSCALL_INTERRUPT_PRIORITY can delay our capture of ulCurrCount.  That delay is limited
+         // to less than one tick duration by stated requirement.  No need to do anything if ulFullCountsLeft
+         // is "negative".  In fact there's no need to do anything if ulFullCountsLeft is less than a whole
+         // tick, but xFullTicksLeft (below) determines that.
          //
-         uint32_t fullCountsLeft = (uint16_t)(idealCmp - currCount - 1UL);
+         uint32_t ulFullCountsLeft = (uint16_t)(usIdealCmp - ulCurrCount - 1UL);
          #if ( configLPTIM_ENABLE_PRECISION == 0 )
-         if (fullCountsLeft < xMaximumSuppressedTicks * ulTimerCountsForOneTick)
+         if (ulFullCountsLeft < xMaximumSuppressedTicks * ulTimerCountsForOneTick)
          #else
-         if (fullCountsLeft < xMaximumSuppressedTicks * LPTIM_CLOCK_HZ / configTICK_RATE_HZ)
+         if (ulFullCountsLeft <= xMaximumSuppressedTicks * LPTIM_CLOCK_HZ / configTICK_RATE_HZ) // See below
          #endif // configLPTIM_ENABLE_PRECISION
          {
             //      Now calculate how many "full" or whole ticks we had left in our expected idle time.  If
             // there are zero full ticks left, then the next scheduled tick interrupt is the one we want
             // anyway.  But if the time left amounts to at least one full tick, then reschedule the first tick
-            // interrupt that we haven't yet skipped.  And update ulCompleteTickPeriods not to count the ones
+            // interrupt that we haven't yet skipped.  And update xCompleteTickPeriods not to count the ones
             // we haven't skipped.
             //
-            uint32_t fullTicksLeft;
+            TickType_t xFullTicksLeft;
             #if ( configLPTIM_ENABLE_PRECISION != 0 )
             {
-               fullTicksLeft = fullCountsLeft * configTICK_RATE_HZ / LPTIM_CLOCK_HZ;
-               if (fullTicksLeft == xExpectedIdleTime)
+               xFullTicksLeft = ulFullCountsLeft * configTICK_RATE_HZ / LPTIM_CLOCK_HZ;
+               if (xFullTicksLeft == xExpectedIdleTime)
                {
                   //      For efficiency, the rescheduling code below might count a tick that occurs at the
                   // very next timer count, even before that count occurs, instead scheduling the subsequent
                   // tick.  With a slow timer, the timer might *still* not have made that count as we arrive
-                  // here again.  Correct fullTicksLeft for that case here.
+                  // here again.  Correct xFullTicksLeft for that case here.  This same case can cause
+                  // ulFullCountsLeft to be equal to the max above (and not necessarily less) -- see above.
                   //
-                  fullTicksLeft = xExpectedIdleTime - 1UL;
+                  xFullTicksLeft = xExpectedIdleTime - (TickType_t)1;
                }
             }
             #else
             {
-               fullTicksLeft = fullCountsLeft / ulTimerCountsForOneTick;
+               xFullTicksLeft = ulFullCountsLeft / ulTimerCountsForOneTick;
             }
             #endif // configLPTIM_ENABLE_PRECISION
-            configASSERT( fullTicksLeft < xExpectedIdleTime );
+            configASSERT( xFullTicksLeft < xExpectedIdleTime );
 
-            if (fullTicksLeft != 0)
+            if (xFullTicksLeft != 0)
             {
-               ulCompleteTickPeriods -= fullTicksLeft;
+               xCompleteTickPeriods -= xFullTicksLeft;
 
                //      Reschedule the next timer interrupt; it's one we had expected to suppress.  Also,
-               // correct runningSubcountError because it still reflects the error we'll have at the end of
+               // correct lRunningSubcountError because it still reflects the error we'll have at the end of
                // the expected idle time.  Modify it to reflect the error at the time of the tick interrupt
                // we're rescheduling now.
                //
-               uint32_t fullTicksLeftAsCounts;
+               uint32_t ulFullTicksLeftAsCounts;
                #if ( configLPTIM_ENABLE_PRECISION != 0 )
                {
-                  fullTicksLeftAsCounts = fullTicksLeft * LPTIM_CLOCK_HZ / configTICK_RATE_HZ;
-                  extraError = fullTicksLeft * LPTIM_CLOCK_HZ % configTICK_RATE_HZ;
-                  runningSubcountError -= extraError;
-                  if (runningSubcountError < -(int)(configTICK_RATE_HZ/2))
+                  ulFullTicksLeftAsCounts = xFullTicksLeft * LPTIM_CLOCK_HZ / configTICK_RATE_HZ;
+                  lExtraError = xFullTicksLeft * LPTIM_CLOCK_HZ % configTICK_RATE_HZ;
+                  lRunningSubcountError -= lExtraError;
+                  if (lRunningSubcountError < -(int)(configTICK_RATE_HZ/2))
                   {
-                     fullTicksLeftAsCounts++;
-                     runningSubcountError += configTICK_RATE_HZ;
+                     ulFullTicksLeftAsCounts++;
+                     lRunningSubcountError += configTICK_RATE_HZ;
                   }
                }
                #else
                {
-                  fullTicksLeftAsCounts = fullTicksLeft * ulTimerCountsForOneTick;
+                  ulFullTicksLeftAsCounts = xFullTicksLeft * ulTimerCountsForOneTick;
                }
                #endif // configLPTIM_ENABLE_PRECISION
 
-               idealCmp -= fullTicksLeftAsCounts; // idealCmp is a uint16_t
+               usIdealCmp -= ulFullTicksLeftAsCounts; // usIdealCmp is a uint16_t
                if (!isCmpWriteInProgress)
                {
                   isCmpWriteInProgress = pdTRUE;
-                  LPTIM->CMP = idealCmp == 0xFFFF ? 0 : idealCmp;  // never write 0xFFFF to CMP (HW rule)
+                  LPTIM->CMP = usIdealCmp == 0xFFFF ? 0 : usIdealCmp;  // never write 0xFFFF to CMP (HW rule)
                }
             }
          }
@@ -632,7 +629,7 @@ void vPortSuppressTicksAndSleep( TickType_t xExpectedIdleTime )
       // modifying xTickCount count here while the tick count ISR is enabled because the scheduler is
       // currently suspended.  That causes the tick ISR to accumulate ticks into a pended-ticks field.
       //
-      vTaskStepTick( ulCompleteTickPeriods );
+      vTaskStepTick( xCompleteTickPeriods );
    }
 }
 
@@ -671,13 +668,13 @@ void LPTIM_IRQHandler( void )
    //      Get a coherent copy of the current count value in the timer.  The CNT register is clocked
    // asynchronously, so we keep reading it until we get the same value during a verification read.  Then
    // determine how "late" we are in responding to the timer interrupt request.  Normally, we're one count
-   // late because LPTIM raises the CMPM interrupt one count *after* the match event.  Use idealCmp in this
+   // late because LPTIM raises the CMPM interrupt one count *after* the match event.  Use usIdealCmp in this
    // determination because it reliably reflects the match time we want right now, regardless of the sync
    // mechanism for CMP.
    //
-   uint32_t countValue;
-   do countValue = LPTIM->CNT; while (countValue != LPTIM->CNT);
-   uint32_t countsLate = (uint16_t)(countValue - idealCmp);
+   uint32_t ulCountValue;
+   do ulCountValue = LPTIM->CNT; while (ulCountValue != LPTIM->CNT);
+   uint32_t ulCountsLate = (uint16_t)(ulCountValue - usIdealCmp);
 
    //      If we're more than one full tick late, then the application masked interrupts for too long.  That
    // condition is typically an indication of a design flaw, so we don't take heroic measures here to avoid
@@ -690,16 +687,16 @@ void LPTIM_IRQHandler( void )
    // still waiting for an upcoming tick, it looks like we're very, very late.  In those cases, we're not
    // actually late, and there is no tick right now.
    //
-   if (countsLate >= ulTimerCountsForOneTick &&
-       countsLate < 65536UL - 1 - ulTimerCountsForOneTick &&
+   if (ulCountsLate >= ulTimerCountsForOneTick &&
+       ulCountsLate < 65536UL - 1 - ulTimerCountsForOneTick &&
        !isTickNowSuppressed)
    {
       //      Optionally report the number of ticks dropped.  (No need for precision here.)  Then arrange to
       // count the tick (below) and to schedule the next tick based on the current timer value.
       //
-      traceTICKS_DROPPED( countsLate / ulTimerCountsForOneTick );
-      idealCmp = countValue;
-      countsLate = 0;
+      traceTICKS_DROPPED( ulCountsLate / ulTimerCountsForOneTick );
+      usIdealCmp = ulCountValue;
+      ulCountsLate = 0;
    }
 
    //      If the ideal CMP value is in the recent past -- within one OS tick time -- then count the tick.
@@ -713,28 +710,28 @@ void LPTIM_IRQHandler( void )
    // occasionally).  And finally, it helps us honor a tick that vPortSuppressTicksAndSleep() has restored,
    // but when the timer appears to have missed the match completely as explained above.
    //
-   if (countsLate < ulTimerCountsForOneTick)
+   if (ulCountsLate < ulTimerCountsForOneTick)
    {
       //      We officially have an OS tick.  Count it, and set up the next one.
 
-      uint32_t numCounts = ulTimerCountsForOneTick;
+      uint32_t ulNumCounts = ulTimerCountsForOneTick;
       #if ( configLPTIM_ENABLE_PRECISION != 0 )
       {
-         runningSubcountError += xTimerSubcountErrorPerTick;
+         lRunningSubcountError += lSubcountErrorPerTick;
          #if ( IS_SUBCOUNT_EPT_POSITIVE )
          {
-            if (runningSubcountError >= (int)(configTICK_RATE_HZ/2))
+            if (lRunningSubcountError >= (int)(configTICK_RATE_HZ/2))
             {
-               numCounts++;
-               runningSubcountError -= configTICK_RATE_HZ;
+               ulNumCounts++;
+               lRunningSubcountError -= configTICK_RATE_HZ;
             }
          }
          #else
          {
-            if (runningSubcountError <= -(int)(configTICK_RATE_HZ/2))
+            if (lRunningSubcountError <= -(int)(configTICK_RATE_HZ/2))
             {
-               numCounts--;
-               runningSubcountError += configTICK_RATE_HZ;
+               ulNumCounts--;
+               lRunningSubcountError += configTICK_RATE_HZ;
             }
          }
          #endif // IS_SUBCOUNT_EPT_POSITIVE
@@ -744,10 +741,10 @@ void LPTIM_IRQHandler( void )
       //      Set up the next tick interrupt.  We must check isCmpWriteInProgress here as usual, in case CMPM
       // can come before CMPOK.
       //
-      idealCmp += numCounts;  // idealCmp is a uint16_t
+      usIdealCmp += ulNumCounts;  // usIdealCmp is a uint16_t
       if (!isCmpWriteInProgress)
       {
-         LPTIM->CMP = idealCmp == 0xFFFF ? 0 : idealCmp;  // never write 0xFFFF to CMP (HW rule)
+         LPTIM->CMP = usIdealCmp == 0xFFFF ? 0 : usIdealCmp;  // never write 0xFFFF to CMP (HW rule)
          isCmpWriteInProgress = pdTRUE;
       }
 
@@ -756,10 +753,10 @@ void LPTIM_IRQHandler( void )
       // interrupts of lower priority than LPTIM even when we set BASEPRI to zero until our ISR ends.
       //
       portDISABLE_INTERRUPTS();
-      int wasHigherPriorityTaskWoken = xTaskIncrementTick();
+      BaseType_t xWasHigherPriorityTaskWoken = xTaskIncrementTick();
       portENABLE_INTERRUPTS();
 
-      portYIELD_FROM_ISR(wasHigherPriorityTaskWoken);
+      portYIELD_FROM_ISR(xWasHigherPriorityTaskWoken);
    }
 
 
@@ -774,12 +771,12 @@ void LPTIM_IRQHandler( void )
       LPTIM->ICR = LPTIM_ICR_CMPOKCF;
 
       //      If there is a "pending" write operation to CMP, do it now.  Otherwise, make note that the write
-      // is now complete.  Remember to watch for CMP set to 0 when idealCmp is 0xFFFF.  There's no
-      // pending write in that case.
+      // is now complete.  Remember to watch for CMP set to 0 when usIdealCmp is 0xFFFF.  There's no pending
+      // write in that case.
       //
-      if ((uint16_t)(LPTIM->CMP - idealCmp) > 1UL)
+      if ((uint16_t)(LPTIM->CMP - usIdealCmp) > 1UL)
       {
-         LPTIM->CMP = idealCmp == 0xFFFF ? 0 : idealCmp; // never write 0xFFFF to CMP (HW rule)
+         LPTIM->CMP = usIdealCmp == 0xFFFF ? 0 : usIdealCmp; // never write 0xFFFF to CMP (HW rule)
          // isCmpWriteInProgress = pdTRUE;  // already true here in the handler for write completed
       }
       else
