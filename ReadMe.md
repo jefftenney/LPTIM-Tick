@@ -42,3 +42,14 @@ __Tickless disabled (FreeRTOS 10.3.1)__
 - Test 1: 9.86mA, no drift
 - Test 2: 9.86mA, no drift
 - Test 3: 9.86mA, no drift
+
+---
+
+## Integrating lptimTick.c into your project
+
+1. Add [lptimTick.c](https://github.com/jefftenney/LPTIM-Tick/blob/main/Core/Src/lptimTick.c) to your project folder, configuration, and/or makefile.
+1. In FreeRTOSConfig.h, define `configUSE_TICKLESS_IDLE` to `2`, and eliminate the preprocessor definition for `xPortSysTickHandler`.  If using LSI instead of LSE, define `configTICK_USES_LSI` and `configLPTIM_REF_CLOCK_HZ` (typically `32000` or `37000`), too.
+1. Update the [#include](https://github.com/jefftenney/LPTIM-Tick/blob/5ca1c2ee5878479d2c5c1bac3c8f6a6ae2dea7eb/Core/Src/lptimTick.c#L32) for your MCU.
+1. Update the LPTIM [instance selection](https://github.com/jefftenney/LPTIM-Tick/blob/5ca1c2ee5878479d2c5c1bac3c8f6a6ae2dea7eb/Core/Src/lptimTick.c#L255-L257).  (For STM32WL users, [here](https://github.com/jefftenney/LPTIM-Tick/blob/5ca1c2ee5878479d2c5c1bac3c8f6a6ae2dea7eb/Core/Src/lptimTick.c#L289) too.)  LPTIM1 is the default.
+1. Update the [initialization code](https://github.com/jefftenney/LPTIM-Tick/blob/5ca1c2ee5878479d2c5c1bac3c8f6a6ae2dea7eb/Core/Src/lptimTick.c#L275-L279) that is specific to both the MCU family and the LPTIM instance.
+
