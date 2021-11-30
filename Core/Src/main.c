@@ -82,7 +82,7 @@ void resultsTimerCallback(void const * argument);
 #define DEMO_STATE_TEST_2  1
 #define DEMO_STATE_TEST_3  2
 #define MAX_DEMO_STATE     DEMO_STATE_TEST_3
-static void vSetDemoState( int state )
+static void vSetDemoState( BaseType_t state )
 {
    //      Assume for now that we're activating a demo state that doesn't need LPTIM2, our stress-test actor.
    //
@@ -152,7 +152,7 @@ static void vSetDemoState( int state )
    }
 
    char banner[100];
-   int len = sprintf(banner, "\r\n\r\nRunning Test %d.", state + 1);
+   int len = sprintf(banner, "\r\n\r\nRunning Test %d.", (int)state + 1);
    if (state != DEMO_STATE_TEST_1)
    {
       len += sprintf(&banner[len], "  Jumps are shown as %% of %d ms.\r\n",
@@ -161,7 +161,7 @@ static void vSetDemoState( int state )
    HAL_UART_Transmit(&huart2, (uint8_t*)banner, len, HAL_MAX_DELAY);
 }
 
-static int xDescribeTickTestResults(TttResults_t* results, int periodNumber, char* dest)
+static int lDescribeTickTestResults(TttResults_t* results, int periodNumber, char* dest)
 {
    int durationSeconds = (results->durationSs + results->subsecondsPerSecond/2) / results->subsecondsPerSecond;
    return (sprintf(dest, "Period %d: %d s, drift: %d/%d s, jump: %+d%% (min), %+d%% (max)",
@@ -172,7 +172,7 @@ static int xDescribeTickTestResults(TttResults_t* results, int periodNumber, cha
                    results->maxDriftRatePct));
 }
 
-static int xUpdateResults( int xDemoState )
+static BaseType_t xUpdateResults( int xDemoState )
 {
    static int resultsCount = 0;
 
@@ -192,12 +192,12 @@ static int xUpdateResults( int xDemoState )
       resultsCount = complete.resultsCounter;
       if (resultsCount != 0)
       {
-         resultsLen += xDescribeTickTestResults(&complete, resultsCount, &textResults[resultsLen]);
+         resultsLen += lDescribeTickTestResults(&complete, resultsCount, &textResults[resultsLen]);
          resultsLen += sprintf(&textResults[resultsLen], "\r\n");
       }
    }
 
-   resultsLen += xDescribeTickTestResults(&inProgress, resultsCount + 1, &textResults[resultsLen]);
+   resultsLen += lDescribeTickTestResults(&inProgress, resultsCount + 1, &textResults[resultsLen]);
 
    //      Send the results to the terminal.  In test 3, use interrupt-driven I/O with the terminal as
    // a way to enhance the stress test.  The interrupts induce a rapid sequence of early wake-ups from
@@ -221,7 +221,7 @@ static int xUpdateResults( int xDemoState )
 
    //      Apply some pass/fail criteria and report any failures.
    //
-   int isFailure = pdFALSE;
+   BaseType_t isFailure = pdFALSE;
    if (inProgress.minDriftRatePct < -2 || inProgress.maxDriftRatePct > 2)
    {
       isFailure = pdTRUE;
@@ -639,7 +639,7 @@ void mainOsTask(void const * argument)
 
    //      Start the demo in state 0.
    //
-   int xDemoState = DEMO_STATE_TEST_1;
+   BaseType_t xDemoState = DEMO_STATE_TEST_1;
    vSetDemoState(xDemoState);
 
    int isFailureDetected = pdFALSE;
@@ -771,4 +771,3 @@ void assert_failed(uint8_t *file, uint32_t line)
 }
 #endif /* USE_FULL_ASSERT */
 
-/************************ (C) COPYRIGHT STMicroelectronics *****END OF FILE****/
