@@ -2,7 +2,7 @@
 //
 // STM32 No-Drift FreeRTOS Tick/Tickless via LPTIM
 //
-// Revision: 2021.08.11
+// Revision: 2021.11.23
 // Tabs: None
 // Columns: 110
 // Compiler: gcc (GNU) / armcc (Arm-Keil) / iccarm (IAR)
@@ -475,6 +475,7 @@ void vPortSuppressTicksAndSleep( TickType_t xExpectedIdleTime )
             //
             __DSB();
             __WFI();
+            __ISB(); // required when debugging in low-power modes (ie, DBGMCU->CR != 0) on some MCUs.
          }
          configPOST_SLEEP_PROCESSING( (const TickType_t)xExpectedIdleTime );
 
