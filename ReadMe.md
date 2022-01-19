@@ -9,6 +9,8 @@ Use LPTIM for the FreeRTOS tick instead of the SysTick Timer for ultra-low-power
 
 This repository demonstrates integration and testing of the [lptimTick.c gist](https://gist.github.com/jefftenney/02b313fe649a14b4c75237f925872d72) on [Nucleo-L476RG](https://www.st.com/en/evaluation-tools/nucleo-l476rg.html) (STM32L476).  The project uses STM32CubeIDE and its integrated code-generation tool (STM32CubeMX).  However, lptimTick.c is compatible with any toolchain supported by FreeRTOS.
 
+A separate repository, [LPTIM-Tick-U5](https://github.com/jefftenney/LPTIM-Tick-U5), is adapted to the STM32U family.
+
 For a thorough evaluation, this project can be built without tickless idle, with the default tickless idle, or with the custom tickless idle provided by lptimTick.c.  See branches for additional evaluation options.
 
 ---
