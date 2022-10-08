@@ -11,6 +11,17 @@
   *           + Reading operation functions.
   *           + Peripheral State functions.
   *
+  ******************************************************************************
+  * @attention
+  *
+  * Copyright (c) 2017 STMicroelectronics.
+  * All rights reserved.
+  *
+  * This software is licensed under terms that can be found in the LICENSE file
+  * in the root directory of this software component.
+  * If no LICENSE file comes with this software, it is provided AS-IS.
+  *
+  ******************************************************************************
   @verbatim
   ==============================================================================
                      ##### How to use this driver #####
@@ -96,13 +107,13 @@
   The compilation define  USE_HAL_LPTIM_REGISTER_CALLBACKS when set to 1
   allows the user to configure dynamically the driver callbacks.
   [..]
-  Use Function @ref HAL_LPTIM_RegisterCallback() to register a callback.
-  @ref HAL_LPTIM_RegisterCallback() takes as parameters the HAL peripheral handle,
+  Use Function HAL_LPTIM_RegisterCallback() to register a callback.
+  HAL_LPTIM_RegisterCallback() takes as parameters the HAL peripheral handle,
   the Callback ID and a pointer to the user callback function.
   [..]
-  Use function @ref HAL_LPTIM_UnRegisterCallback() to reset a callback to the
+  Use function HAL_LPTIM_UnRegisterCallback() to reset a callback to the
   default weak function.
-  @ref HAL_LPTIM_UnRegisterCallback takes as parameters the HAL peripheral handle,
+  HAL_LPTIM_UnRegisterCallback takes as parameters the HAL peripheral handle,
   and the Callback ID.
   [..]
   These functions allow to register/unregister following callbacks:
@@ -120,7 +131,7 @@
   [..]
   By default, after the Init and when the state is HAL_LPTIM_STATE_RESET
   all interrupt callbacks are set to the corresponding weak functions:
-  examples @ref HAL_LPTIM_TriggerCallback(), @ref HAL_LPTIM_CompareMatchCallback().
+  examples HAL_LPTIM_TriggerCallback(), HAL_LPTIM_CompareMatchCallback().
 
   [..]
   Exception done for MspInit and MspDeInit functions that are reset to the legacy weak
@@ -134,7 +145,7 @@
   in HAL_LPTIM_STATE_READY or HAL_LPTIM_STATE_RESET state,
   thus registered (user) MspInit/DeInit callbacks can be used during the Init/DeInit.
   In that case first register the MspInit/MspDeInit user callbacks
-  using @ref HAL_LPTIM_RegisterCallback() before calling DeInit or Init function.
+  using HAL_LPTIM_RegisterCallback() before calling DeInit or Init function.
 
   [..]
   When The compilation define USE_HAL_LPTIM_REGISTER_CALLBACKS is set to 0 or
@@ -142,17 +153,6 @@
   are set to the corresponding weak functions.
 
   @endverbatim
-  ******************************************************************************
-  * @attention
-  *
-  * <h2><center>&copy; Copyright (c) 2017 STMicroelectronics.
-  * All rights reserved.</center></h2>
-  *
-  * This software component is licensed by ST under BSD 3-Clause license,
-  * the "License"; You may not use this file except in compliance with the
-  * License. You may obtain a copy of the License at:
-  *                        opensource.org/licenses/BSD-3-Clause
-  *
   ******************************************************************************
   */
 
@@ -253,8 +253,8 @@ HAL_StatusTypeDef HAL_LPTIM_Init(LPTIM_HandleTypeDef *hlptim)
 
   assert_param(IS_LPTIM_CLOCK_SOURCE(hlptim->Init.Clock.Source));
   assert_param(IS_LPTIM_CLOCK_PRESCALER(hlptim->Init.Clock.Prescaler));
-  if ((hlptim->Init.Clock.Source == LPTIM_CLOCKSOURCE_ULPTIM) 
-   || (hlptim->Init.CounterSource == LPTIM_COUNTERSOURCE_EXTERNAL))
+  if ((hlptim->Init.Clock.Source == LPTIM_CLOCKSOURCE_ULPTIM)
+      || (hlptim->Init.CounterSource == LPTIM_COUNTERSOURCE_EXTERNAL))
   {
     assert_param(IS_LPTIM_CLOCK_POLARITY(hlptim->Init.UltraLowPowerClock.Polarity));
     assert_param(IS_LPTIM_CLOCK_SAMPLE_TIME(hlptim->Init.UltraLowPowerClock.SampleTime));
@@ -326,8 +326,8 @@ HAL_StatusTypeDef HAL_LPTIM_Init(LPTIM_HandleTypeDef *hlptim)
   /* Get the LPTIMx CFGR value */
   tmpcfgr = hlptim->Instance->CFGR;
 
-  if ((hlptim->Init.Clock.Source == LPTIM_CLOCKSOURCE_ULPTIM) 
-   || (hlptim->Init.CounterSource == LPTIM_COUNTERSOURCE_EXTERNAL))
+  if ((hlptim->Init.Clock.Source == LPTIM_CLOCKSOURCE_ULPTIM)
+      || (hlptim->Init.CounterSource == LPTIM_COUNTERSOURCE_EXTERNAL))
   {
     tmpcfgr &= (uint32_t)(~(LPTIM_CFGR_CKPOL | LPTIM_CFGR_CKFLT));
   }
@@ -357,8 +357,8 @@ HAL_StatusTypeDef HAL_LPTIM_Init(LPTIM_HandleTypeDef *hlptim)
   }
 
   /* Configure LPTIM external clock polarity and digital filter */
-  if ((hlptim->Init.Clock.Source == LPTIM_CLOCKSOURCE_ULPTIM) 
-   || (hlptim->Init.CounterSource == LPTIM_COUNTERSOURCE_EXTERNAL))
+  if ((hlptim->Init.Clock.Source == LPTIM_CLOCKSOURCE_ULPTIM)
+      || (hlptim->Init.CounterSource == LPTIM_COUNTERSOURCE_EXTERNAL))
   {
     tmpcfgr |= (hlptim->Init.UltraLowPowerClock.Polarity |
                 hlptim->Init.UltraLowPowerClock.SampleTime);
@@ -513,7 +513,7 @@ __weak void HAL_LPTIM_MspDeInit(LPTIM_HandleTypeDef *hlptim)
   * @brief  Start the LPTIM PWM generation.
   * @param  hlptim LPTIM handle
   * @param  Period Specifies the Autoreload value.
-  *         This parameter must be a value between 0x0000 and 0xFFFF.
+  *         This parameter must be a value between 0x0001 and 0xFFFF.
   * @param  Pulse Specifies the compare value.
   *         This parameter must be a value between 0x0000 and 0xFFFF.
   * @retval HAL status
@@ -561,7 +561,7 @@ HAL_StatusTypeDef HAL_LPTIM_PWM_Start(LPTIM_HandleTypeDef *hlptim, uint32_t Peri
   /* Start timer in continuous mode */
   __HAL_LPTIM_START_CONTINUOUS(hlptim);
 
-  /* Change the TIM state*/
+  /* Change the LPTIM state */
   hlptim->State = HAL_LPTIM_STATE_READY;
 
   /* Return function status */
@@ -578,7 +578,7 @@ HAL_StatusTypeDef HAL_LPTIM_PWM_Stop(LPTIM_HandleTypeDef *hlptim)
   /* Check the parameters */
   assert_param(IS_LPTIM_INSTANCE(hlptim->Instance));
 
-  /* Set the LPTIM state */
+  /* Change the LPTIM state */
   hlptim->State = HAL_LPTIM_STATE_BUSY;
 
   /* Disable the Peripheral */
@@ -589,7 +589,7 @@ HAL_StatusTypeDef HAL_LPTIM_PWM_Stop(LPTIM_HandleTypeDef *hlptim)
     return HAL_TIMEOUT;
   }
 
-  /* Change the TIM state*/
+  /* Change the LPTIM state */
   hlptim->State = HAL_LPTIM_STATE_READY;
 
   /* Return function status */
@@ -600,7 +600,7 @@ HAL_StatusTypeDef HAL_LPTIM_PWM_Stop(LPTIM_HandleTypeDef *hlptim)
   * @brief  Start the LPTIM PWM generation in interrupt mode.
   * @param  hlptim LPTIM handle
   * @param  Period Specifies the Autoreload value.
-  *         This parameter must be a value between 0x0000 and 0xFFFF
+  *         This parameter must be a value between 0x0001 and 0xFFFF
   * @param  Pulse Specifies the compare value.
   *         This parameter must be a value between 0x0000 and 0xFFFF
   * @retval HAL status
@@ -686,7 +686,7 @@ HAL_StatusTypeDef HAL_LPTIM_PWM_Start_IT(LPTIM_HandleTypeDef *hlptim, uint32_t P
   /* Start timer in continuous mode */
   __HAL_LPTIM_START_CONTINUOUS(hlptim);
 
-  /* Change the TIM state*/
+  /* Change the LPTIM state */
   hlptim->State = HAL_LPTIM_STATE_READY;
 
   /* Return function status */
@@ -703,7 +703,7 @@ HAL_StatusTypeDef HAL_LPTIM_PWM_Stop_IT(LPTIM_HandleTypeDef *hlptim)
   /* Check the parameters */
   assert_param(IS_LPTIM_INSTANCE(hlptim->Instance));
 
-  /* Set the LPTIM state */
+  /* Change the LPTIM state */
   hlptim->State = HAL_LPTIM_STATE_BUSY;
 
   /* Disable the Peripheral */
@@ -741,7 +741,7 @@ HAL_StatusTypeDef HAL_LPTIM_PWM_Stop_IT(LPTIM_HandleTypeDef *hlptim)
   __HAL_LPTIM_DISABLE_IT(hlptim, LPTIM_IT_UPDATE);
 #endif
 
-  /* Change the TIM state*/
+  /* Change the LPTIM state */
   hlptim->State = HAL_LPTIM_STATE_READY;
 
   /* Return function status */
@@ -752,7 +752,7 @@ HAL_StatusTypeDef HAL_LPTIM_PWM_Stop_IT(LPTIM_HandleTypeDef *hlptim)
   * @brief  Start the LPTIM One pulse generation.
   * @param  hlptim LPTIM handle
   * @param  Period Specifies the Autoreload value.
-  *         This parameter must be a value between 0x0000 and 0xFFFF.
+  *         This parameter must be a value between 0x0001 and 0xFFFF.
   * @param  Pulse Specifies the compare value.
   *         This parameter must be a value between 0x0000 and 0xFFFF.
   * @retval HAL status
@@ -800,7 +800,7 @@ HAL_StatusTypeDef HAL_LPTIM_OnePulse_Start(LPTIM_HandleTypeDef *hlptim, uint32_t
   /* Start timer in single (one shot) mode */
   __HAL_LPTIM_START_SINGLE(hlptim);
 
-  /* Change the TIM state*/
+  /* Change the LPTIM state */
   hlptim->State = HAL_LPTIM_STATE_READY;
 
   /* Return function status */
@@ -828,7 +828,7 @@ HAL_StatusTypeDef HAL_LPTIM_OnePulse_Stop(LPTIM_HandleTypeDef *hlptim)
     return HAL_TIMEOUT;
   }
 
-  /* Change the TIM state*/
+  /* Change the LPTIM state */
   hlptim->State = HAL_LPTIM_STATE_READY;
 
   /* Return function status */
@@ -839,7 +839,7 @@ HAL_StatusTypeDef HAL_LPTIM_OnePulse_Stop(LPTIM_HandleTypeDef *hlptim)
   * @brief  Start the LPTIM One pulse generation in interrupt mode.
   * @param  hlptim LPTIM handle
   * @param  Period Specifies the Autoreload value.
-  *         This parameter must be a value between 0x0000 and 0xFFFF.
+  *         This parameter must be a value between 0x0001 and 0xFFFF.
   * @param  Pulse Specifies the compare value.
   *         This parameter must be a value between 0x0000 and 0xFFFF.
   * @retval HAL status
@@ -925,7 +925,7 @@ HAL_StatusTypeDef HAL_LPTIM_OnePulse_Start_IT(LPTIM_HandleTypeDef *hlptim, uint3
   /* Start timer in single (one shot) mode */
   __HAL_LPTIM_START_SINGLE(hlptim);
 
-  /* Change the TIM state*/
+  /* Change the LPTIM state */
   hlptim->State = HAL_LPTIM_STATE_READY;
 
   /* Return function status */
@@ -944,6 +944,7 @@ HAL_StatusTypeDef HAL_LPTIM_OnePulse_Stop_IT(LPTIM_HandleTypeDef *hlptim)
 
   /* Set the LPTIM state */
   hlptim->State = HAL_LPTIM_STATE_BUSY;
+
 
   /* Disable the Peripheral */
   __HAL_LPTIM_DISABLE(hlptim);
@@ -980,7 +981,7 @@ HAL_StatusTypeDef HAL_LPTIM_OnePulse_Stop_IT(LPTIM_HandleTypeDef *hlptim)
   __HAL_LPTIM_DISABLE_IT(hlptim, LPTIM_IT_UPDATE);
 #endif
 
-  /* Change the TIM state*/
+  /* Change the LPTIM state */
   hlptim->State = HAL_LPTIM_STATE_READY;
 
   /* Return function status */
@@ -991,7 +992,7 @@ HAL_StatusTypeDef HAL_LPTIM_OnePulse_Stop_IT(LPTIM_HandleTypeDef *hlptim)
   * @brief  Start the LPTIM in Set once mode.
   * @param  hlptim LPTIM handle
   * @param  Period Specifies the Autoreload value.
-  *         This parameter must be a value between 0x0000 and 0xFFFF.
+  *         This parameter must be a value between 0x0001 and 0xFFFF.
   * @param  Pulse Specifies the compare value.
   *         This parameter must be a value between 0x0000 and 0xFFFF.
   * @retval HAL status
@@ -1039,7 +1040,7 @@ HAL_StatusTypeDef HAL_LPTIM_SetOnce_Start(LPTIM_HandleTypeDef *hlptim, uint32_t 
   /* Start timer in single (one shot) mode */
   __HAL_LPTIM_START_SINGLE(hlptim);
 
-  /* Change the TIM state*/
+  /* Change the LPTIM state */
   hlptim->State = HAL_LPTIM_STATE_READY;
 
   /* Return function status */
@@ -1067,7 +1068,7 @@ HAL_StatusTypeDef HAL_LPTIM_SetOnce_Stop(LPTIM_HandleTypeDef *hlptim)
     return HAL_TIMEOUT;
   }
 
-  /* Change the TIM state*/
+  /* Change the LPTIM state */
   hlptim->State = HAL_LPTIM_STATE_READY;
 
   /* Return function status */
@@ -1156,7 +1157,7 @@ HAL_StatusTypeDef HAL_LPTIM_SetOnce_Start_IT(LPTIM_HandleTypeDef *hlptim, uint32
   /* Start timer in single (one shot) mode */
   __HAL_LPTIM_START_SINGLE(hlptim);
 
-  /* Change the TIM state*/
+  /* Change the LPTIM state */
   hlptim->State = HAL_LPTIM_STATE_READY;
 
   /* Return function status */
@@ -1203,7 +1204,7 @@ HAL_StatusTypeDef HAL_LPTIM_SetOnce_Stop_IT(LPTIM_HandleTypeDef *hlptim)
     __HAL_LPTIM_DISABLE_IT(hlptim, LPTIM_IT_EXTTRIG);
   }
 
-  /* Change the TIM state*/
+  /* Change the LPTIM state */
   hlptim->State = HAL_LPTIM_STATE_READY;
 
   /* Return function status */
@@ -1214,7 +1215,7 @@ HAL_StatusTypeDef HAL_LPTIM_SetOnce_Stop_IT(LPTIM_HandleTypeDef *hlptim)
   * @brief  Start the Encoder interface.
   * @param  hlptim LPTIM handle
   * @param  Period Specifies the Autoreload value.
-  *         This parameter must be a value between 0x0000 and 0xFFFF.
+  *         This parameter must be a value between 0x0001 and 0xFFFF.
   * @retval HAL status
   */
 HAL_StatusTypeDef HAL_LPTIM_Encoder_Start(LPTIM_HandleTypeDef *hlptim, uint32_t Period)
@@ -1264,7 +1265,7 @@ HAL_StatusTypeDef HAL_LPTIM_Encoder_Start(LPTIM_HandleTypeDef *hlptim, uint32_t 
   /* Start timer in continuous mode */
   __HAL_LPTIM_START_CONTINUOUS(hlptim);
 
-  /* Change the TIM state*/
+  /* Change the LPTIM state */
   hlptim->State = HAL_LPTIM_STATE_READY;
 
   /* Return function status */
@@ -1295,7 +1296,7 @@ HAL_StatusTypeDef HAL_LPTIM_Encoder_Stop(LPTIM_HandleTypeDef *hlptim)
   /* Reset ENC bit to disable the encoder interface */
   hlptim->Instance->CFGR &= ~LPTIM_CFGR_ENC;
 
-  /* Change the TIM state*/
+  /* Change the LPTIM state */
   hlptim->State = HAL_LPTIM_STATE_READY;
 
   /* Return function status */
@@ -1374,7 +1375,7 @@ HAL_StatusTypeDef HAL_LPTIM_Encoder_Start_IT(LPTIM_HandleTypeDef *hlptim, uint32
   /* Start timer in continuous mode */
   __HAL_LPTIM_START_CONTINUOUS(hlptim);
 
-  /* Change the TIM state*/
+  /* Change the LPTIM state */
   hlptim->State = HAL_LPTIM_STATE_READY;
 
   /* Return function status */
@@ -1411,7 +1412,7 @@ HAL_StatusTypeDef HAL_LPTIM_Encoder_Stop_IT(LPTIM_HandleTypeDef *hlptim)
   /* Disable "switch to up direction" interrupt */
   __HAL_LPTIM_DISABLE_IT(hlptim, LPTIM_IT_UP);
 
-  /* Change the TIM state*/
+  /* Change the LPTIM state */
   hlptim->State = HAL_LPTIM_STATE_READY;
 
   /* Return function status */
@@ -1424,7 +1425,7 @@ HAL_StatusTypeDef HAL_LPTIM_Encoder_Stop_IT(LPTIM_HandleTypeDef *hlptim)
   *         trigger event will reset the counter and the timer restarts.
   * @param  hlptim LPTIM handle
   * @param  Period Specifies the Autoreload value.
-  *         This parameter must be a value between 0x0000 and 0xFFFF.
+  *         This parameter must be a value between 0x0001 and 0xFFFF.
   * @param  Timeout Specifies the TimeOut value to reset the counter.
   *         This parameter must be a value between 0x0000 and 0xFFFF.
   * @retval HAL status
@@ -1472,7 +1473,7 @@ HAL_StatusTypeDef HAL_LPTIM_TimeOut_Start(LPTIM_HandleTypeDef *hlptim, uint32_t 
   /* Start timer in continuous mode */
   __HAL_LPTIM_START_CONTINUOUS(hlptim);
 
-  /* Change the TIM state*/
+  /* Change the LPTIM state */
   hlptim->State = HAL_LPTIM_STATE_READY;
 
   /* Return function status */
@@ -1503,7 +1504,7 @@ HAL_StatusTypeDef HAL_LPTIM_TimeOut_Stop(LPTIM_HandleTypeDef *hlptim)
   /* Reset TIMOUT bit to enable the timeout function */
   hlptim->Instance->CFGR &= ~LPTIM_CFGR_TIMOUT;
 
-  /* Change the TIM state*/
+  /* Change the LPTIM state */
   hlptim->State = HAL_LPTIM_STATE_READY;
 
   /* Return function status */
@@ -1516,7 +1517,7 @@ HAL_StatusTypeDef HAL_LPTIM_TimeOut_Stop(LPTIM_HandleTypeDef *hlptim)
   *         trigger event will reset the counter and the timer restarts.
   * @param  hlptim LPTIM handle
   * @param  Period Specifies the Autoreload value.
-  *         This parameter must be a value between 0x0000 and 0xFFFF.
+  *         This parameter must be a value between 0x0001 and 0xFFFF.
   * @param  Timeout Specifies the TimeOut value to reset the counter.
   *         This parameter must be a value between 0x0000 and 0xFFFF.
   * @retval HAL status
@@ -1581,7 +1582,7 @@ HAL_StatusTypeDef HAL_LPTIM_TimeOut_Start_IT(LPTIM_HandleTypeDef *hlptim, uint32
   /* Start timer in continuous mode */
   __HAL_LPTIM_START_CONTINUOUS(hlptim);
 
-  /* Change the TIM state*/
+  /* Change the LPTIM state */
   hlptim->State = HAL_LPTIM_STATE_READY;
 
   /* Return function status */
@@ -1598,11 +1599,12 @@ HAL_StatusTypeDef HAL_LPTIM_TimeOut_Stop_IT(LPTIM_HandleTypeDef *hlptim)
   /* Check the parameters */
   assert_param(IS_LPTIM_INSTANCE(hlptim->Instance));
 
-  /* Set the LPTIM state */
-  hlptim->State = HAL_LPTIM_STATE_BUSY;
 
   /* Disable EXTI Line interrupt on the LPTIM Wake-up Timer */
   __HAL_LPTIM_WAKEUPTIMER_EXTI_DISABLE_IT(hlptim->Instance);
+
+  /* Set the LPTIM state */
+  hlptim->State = HAL_LPTIM_STATE_BUSY;
 
   /* Disable the Peripheral */
   __HAL_LPTIM_DISABLE(hlptim);
@@ -1618,7 +1620,7 @@ HAL_StatusTypeDef HAL_LPTIM_TimeOut_Stop_IT(LPTIM_HandleTypeDef *hlptim)
   /* Disable Compare match interrupt */
   __HAL_LPTIM_DISABLE_IT(hlptim, LPTIM_IT_CMPM);
 
-  /* Change the TIM state*/
+  /* Change the LPTIM state */
   hlptim->State = HAL_LPTIM_STATE_READY;
 
   /* Return function status */
@@ -1629,7 +1631,7 @@ HAL_StatusTypeDef HAL_LPTIM_TimeOut_Stop_IT(LPTIM_HandleTypeDef *hlptim)
   * @brief  Start the Counter mode.
   * @param  hlptim LPTIM handle
   * @param  Period Specifies the Autoreload value.
-  *         This parameter must be a value between 0x0000 and 0xFFFF.
+  *         This parameter must be a value between 0x0001 and 0xFFFF.
   * @retval HAL status
   */
 HAL_StatusTypeDef HAL_LPTIM_Counter_Start(LPTIM_HandleTypeDef *hlptim, uint32_t Period)
@@ -1669,7 +1671,7 @@ HAL_StatusTypeDef HAL_LPTIM_Counter_Start(LPTIM_HandleTypeDef *hlptim, uint32_t 
   /* Start timer in continuous mode */
   __HAL_LPTIM_START_CONTINUOUS(hlptim);
 
-  /* Change the TIM state*/
+  /* Change the LPTIM state */
   hlptim->State = HAL_LPTIM_STATE_READY;
 
   /* Return function status */
@@ -1697,7 +1699,7 @@ HAL_StatusTypeDef HAL_LPTIM_Counter_Stop(LPTIM_HandleTypeDef *hlptim)
     return HAL_TIMEOUT;
   }
 
-  /* Change the TIM state*/
+  /* Change the LPTIM state */
   hlptim->State = HAL_LPTIM_STATE_READY;
 
   /* Return function status */
@@ -1708,7 +1710,7 @@ HAL_StatusTypeDef HAL_LPTIM_Counter_Stop(LPTIM_HandleTypeDef *hlptim)
   * @brief  Start the Counter mode in interrupt mode.
   * @param  hlptim LPTIM handle
   * @param  Period Specifies the Autoreload value.
-  *         This parameter must be a value between 0x0000 and 0xFFFF.
+  *         This parameter must be a value between 0x0001 and 0xFFFF.
   * @retval HAL status
   */
 HAL_StatusTypeDef HAL_LPTIM_Counter_Start_IT(LPTIM_HandleTypeDef *hlptim, uint32_t Period)
@@ -1776,7 +1778,7 @@ HAL_StatusTypeDef HAL_LPTIM_Counter_Start_IT(LPTIM_HandleTypeDef *hlptim, uint32
   /* Start timer in continuous mode */
   __HAL_LPTIM_START_CONTINUOUS(hlptim);
 
-  /* Change the TIM state*/
+  /* Change the LPTIM state */
   hlptim->State = HAL_LPTIM_STATE_READY;
 
   /* Return function status */
@@ -1793,11 +1795,12 @@ HAL_StatusTypeDef HAL_LPTIM_Counter_Stop_IT(LPTIM_HandleTypeDef *hlptim)
   /* Check the parameters */
   assert_param(IS_LPTIM_INSTANCE(hlptim->Instance));
 
-  /* Set the LPTIM state */
-  hlptim->State = HAL_LPTIM_STATE_BUSY;
 
   /* Disable EXTI Line interrupt on the LPTIM Wake-up Timer */
   __HAL_LPTIM_WAKEUPTIMER_EXTI_DISABLE_IT(hlptim->Instance);
+
+  /* Set the LPTIM state */
+  hlptim->State = HAL_LPTIM_STATE_BUSY;
 
   /* Disable the Peripheral */
   __HAL_LPTIM_DISABLE(hlptim);
@@ -1820,7 +1823,7 @@ HAL_StatusTypeDef HAL_LPTIM_Counter_Stop_IT(LPTIM_HandleTypeDef *hlptim)
   /* Disable Update Event interrupt */
   __HAL_LPTIM_DISABLE_IT(hlptim, LPTIM_IT_UPDATE);
 #endif
-  /* Change the TIM state*/
+  /* Change the LPTIM state */
   hlptim->State = HAL_LPTIM_STATE_READY;
 
   /* Return function status */
@@ -1851,7 +1854,7 @@ HAL_StatusTypeDef HAL_LPTIM_Counter_Stop_IT(LPTIM_HandleTypeDef *hlptim)
   * @param  hlptim LPTIM handle
   * @retval Counter value.
   */
-uint32_t HAL_LPTIM_ReadCounter(LPTIM_HandleTypeDef *hlptim)
+uint32_t HAL_LPTIM_ReadCounter(const LPTIM_HandleTypeDef *hlptim)
 {
   /* Check the parameters */
   assert_param(IS_LPTIM_INSTANCE(hlptim->Instance));
@@ -1864,7 +1867,7 @@ uint32_t HAL_LPTIM_ReadCounter(LPTIM_HandleTypeDef *hlptim)
   * @param  hlptim LPTIM handle
   * @retval Autoreload value.
   */
-uint32_t HAL_LPTIM_ReadAutoReload(LPTIM_HandleTypeDef *hlptim)
+uint32_t HAL_LPTIM_ReadAutoReload(const LPTIM_HandleTypeDef *hlptim)
 {
   /* Check the parameters */
   assert_param(IS_LPTIM_INSTANCE(hlptim->Instance));
@@ -1877,7 +1880,7 @@ uint32_t HAL_LPTIM_ReadAutoReload(LPTIM_HandleTypeDef *hlptim)
   * @param  hlptim LPTIM handle
   * @retval Compare value.
   */
-uint32_t HAL_LPTIM_ReadCompare(LPTIM_HandleTypeDef *hlptim)
+uint32_t HAL_LPTIM_ReadCompare(const LPTIM_HandleTypeDef *hlptim)
 {
   /* Check the parameters */
   assert_param(IS_LPTIM_INSTANCE(hlptim->Instance));
@@ -2364,48 +2367,59 @@ HAL_StatusTypeDef HAL_LPTIM_UnRegisterCallback(LPTIM_HandleTypeDef        *hlpti
     switch (CallbackID)
     {
       case HAL_LPTIM_MSPINIT_CB_ID :
-        hlptim->MspInitCallback = HAL_LPTIM_MspInit;                          /* Legacy weak MspInit Callback */
+        /* Legacy weak MspInit Callback */
+        hlptim->MspInitCallback = HAL_LPTIM_MspInit;
         break;
 
       case HAL_LPTIM_MSPDEINIT_CB_ID :
-        hlptim->MspDeInitCallback = HAL_LPTIM_MspDeInit;                       /* Legacy weak Msp DeInit Callback */
+        /* Legacy weak Msp DeInit Callback */
+        hlptim->MspDeInitCallback = HAL_LPTIM_MspDeInit;
         break;
 
       case HAL_LPTIM_COMPARE_MATCH_CB_ID :
-        hlptim->CompareMatchCallback = HAL_LPTIM_CompareMatchCallback;         /* Legacy weak Compare match Callback */
+        /* Legacy weak Compare match Callback */
+        hlptim->CompareMatchCallback = HAL_LPTIM_CompareMatchCallback;
         break;
 
       case HAL_LPTIM_AUTORELOAD_MATCH_CB_ID :
-        hlptim->AutoReloadMatchCallback = HAL_LPTIM_AutoReloadMatchCallback;   /* Legacy weak Auto-reload match Callback */
+        /* Legacy weak Auto-reload match Callback */
+        hlptim->AutoReloadMatchCallback = HAL_LPTIM_AutoReloadMatchCallback;
         break;
 
       case HAL_LPTIM_TRIGGER_CB_ID :
-        hlptim->TriggerCallback = HAL_LPTIM_TriggerCallback;                   /* Legacy weak External trigger event detection Callback */
+        /* Legacy weak External trigger event detection Callback */
+        hlptim->TriggerCallback = HAL_LPTIM_TriggerCallback;
         break;
 
       case HAL_LPTIM_COMPARE_WRITE_CB_ID :
-        hlptim->CompareWriteCallback = HAL_LPTIM_CompareWriteCallback;         /* Legacy weak Compare register write complete Callback */
+        /* Legacy weak Compare register write complete Callback */
+        hlptim->CompareWriteCallback = HAL_LPTIM_CompareWriteCallback;
         break;
 
       case HAL_LPTIM_AUTORELOAD_WRITE_CB_ID :
-        hlptim->AutoReloadWriteCallback = HAL_LPTIM_AutoReloadWriteCallback;   /* Legacy weak Auto-reload register write complete Callback */
+        /* Legacy weak Auto-reload register write complete Callback */
+        hlptim->AutoReloadWriteCallback = HAL_LPTIM_AutoReloadWriteCallback;
         break;
 
       case HAL_LPTIM_DIRECTION_UP_CB_ID :
-        hlptim->DirectionUpCallback = HAL_LPTIM_DirectionUpCallback;           /* Legacy weak Up-counting direction change Callback */
+        /* Legacy weak Up-counting direction change Callback */
+        hlptim->DirectionUpCallback = HAL_LPTIM_DirectionUpCallback;
         break;
 
       case HAL_LPTIM_DIRECTION_DOWN_CB_ID :
-        hlptim->DirectionDownCallback = HAL_LPTIM_DirectionDownCallback;       /* Legacy weak Down-counting direction change Callback */
+        /* Legacy weak Down-counting direction change Callback */
+        hlptim->DirectionDownCallback = HAL_LPTIM_DirectionDownCallback;
         break;
 #if defined(LPTIM_RCR_REP)
 
       case HAL_LPTIM_UPDATE_EVENT_CB_ID :
-        hlptim->UpdateEventCallback = HAL_LPTIM_UpdateEventCallback;           /* Legacy weak Update event detection Callback */
+        /* Legacy weak Update event detection Callback */
+        hlptim->UpdateEventCallback = HAL_LPTIM_UpdateEventCallback;
         break;
 
       case HAL_LPTIM_REP_COUNTER_WRITE_CB_ID :
-        hlptim->RepCounterWriteCallback = HAL_LPTIM_RepCounterWriteCallback;   /* Legacy weak Repetition counter register write complete Callback */
+        /* Legacy weak Repetition counter register write complete Callback */
+        hlptim->RepCounterWriteCallback = HAL_LPTIM_RepCounterWriteCallback;
         break;
 #endif
 
@@ -2420,11 +2434,13 @@ HAL_StatusTypeDef HAL_LPTIM_UnRegisterCallback(LPTIM_HandleTypeDef        *hlpti
     switch (CallbackID)
     {
       case HAL_LPTIM_MSPINIT_CB_ID :
-        hlptim->MspInitCallback = HAL_LPTIM_MspInit;                           /* Legacy weak MspInit Callback */
+        /* Legacy weak MspInit Callback */
+        hlptim->MspInitCallback = HAL_LPTIM_MspInit;
         break;
 
       case HAL_LPTIM_MSPDEINIT_CB_ID :
-        hlptim->MspDeInitCallback = HAL_LPTIM_MspDeInit;                        /* Legacy weak Msp DeInit Callback */
+        /* Legacy weak Msp DeInit Callback */
+        hlptim->MspDeInitCallback = HAL_LPTIM_MspDeInit;
         break;
 
       default :
@@ -2499,16 +2515,16 @@ HAL_LPTIM_StateTypeDef HAL_LPTIM_GetState(LPTIM_HandleTypeDef *hlptim)
 static void LPTIM_ResetCallback(LPTIM_HandleTypeDef *lptim)
 {
   /* Reset the LPTIM callback to the legacy weak callbacks */
-  lptim->CompareMatchCallback    = HAL_LPTIM_CompareMatchCallback;    /* Compare match Callback                       */
-  lptim->AutoReloadMatchCallback = HAL_LPTIM_AutoReloadMatchCallback; /* Auto-reload match Callback                   */
-  lptim->TriggerCallback         = HAL_LPTIM_TriggerCallback;         /* External trigger event detection Callback    */
-  lptim->CompareWriteCallback    = HAL_LPTIM_CompareWriteCallback;    /* Compare register write complete Callback     */
-  lptim->AutoReloadWriteCallback = HAL_LPTIM_AutoReloadWriteCallback; /* Auto-reload register write complete Callback */
-  lptim->DirectionUpCallback     = HAL_LPTIM_DirectionUpCallback;     /* Up-counting direction change Callback        */
-  lptim->DirectionDownCallback   = HAL_LPTIM_DirectionDownCallback;   /* Down-counting direction change Callback      */
+  lptim->CompareMatchCallback    = HAL_LPTIM_CompareMatchCallback;
+  lptim->AutoReloadMatchCallback = HAL_LPTIM_AutoReloadMatchCallback;
+  lptim->TriggerCallback         = HAL_LPTIM_TriggerCallback;
+  lptim->CompareWriteCallback    = HAL_LPTIM_CompareWriteCallback;
+  lptim->AutoReloadWriteCallback = HAL_LPTIM_AutoReloadWriteCallback;
+  lptim->DirectionUpCallback     = HAL_LPTIM_DirectionUpCallback;
+  lptim->DirectionDownCallback   = HAL_LPTIM_DirectionDownCallback;
 #if defined(LPTIM_RCR_REP)
-  lptim->UpdateEventCallback = HAL_LPTIM_UpdateEventCallback;         /* Update event detection Callback              */
-  lptim->RepCounterWriteCallback = HAL_LPTIM_RepCounterWriteCallback; /* Repetition counter register write complete Callback */
+  lptim->UpdateEventCallback = HAL_LPTIM_UpdateEventCallback;
+  lptim->RepCounterWriteCallback = HAL_LPTIM_RepCounterWriteCallback;
 #endif
 }
 #endif /* USE_HAL_LPTIM_REGISTER_CALLBACKS */
@@ -2552,12 +2568,15 @@ void LPTIM_Disable(LPTIM_HandleTypeDef *hlptim)
   uint32_t tmpCFGR;
   uint32_t tmpCMP;
   uint32_t tmpARR;
+  uint32_t primask_bit;
   uint32_t tmpOR;
 #if defined(LPTIM_RCR_REP)
   uint32_t tmpRCR;
 #endif
 
-  __disable_irq();
+  /* Enter critical section */
+  primask_bit = __get_PRIMASK();
+  __set_PRIMASK(1) ;
 
   /*********** Save LPTIM Config ***********/
   /* Save LPTIM source clock */
@@ -2691,7 +2710,8 @@ void LPTIM_Disable(LPTIM_HandleTypeDef *hlptim)
   hlptim->Instance->CFGR = tmpCFGR;
   hlptim->Instance->OR = tmpOR;
 
-  __enable_irq();
+  /* Exit critical section: restore previous priority mask */
+  __set_PRIMASK(primask_bit);
 }
 /**
   * @}
@@ -2706,5 +2726,3 @@ void LPTIM_Disable(LPTIM_HandleTypeDef *hlptim)
 /**
   * @}
   */
-
-/************************ (C) COPYRIGHT STMicroelectronics *****END OF FILE****/
