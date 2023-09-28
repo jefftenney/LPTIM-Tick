@@ -2,6 +2,9 @@
 //
 // Automatically use STOP modes in FreeRTOS whenever application conditions permit.
 
+#ifndef INC_ULP_H_
+#define INC_ULP_H_
+
 //      Symbol configMIN_RUN_BETWEEN_DEEP_SLEEPS, optionally defined in FreeRTOSConfig.h, enables a workaround
 // for erratum 2.3.21, which affects some STM32 devices (like the 'L476).  If the STM32 used in this project
 // is not affected by this erratum, leave symbol configMIN_RUN_BETWEEN_DEEP_SLEEPS undefined.
@@ -39,3 +42,5 @@ void vUlpOnPeripheralsInactiveFromISR( int xPeripherals );
 void vUlpPreSleepProcessing();
 
 void vUlpPostSleepProcessing();
+
+#endif /* INC_ULP_H_ */
