@@ -293,6 +293,12 @@ void vPortSetupTimerInterrupt( void )
    //
    configASSERT(IS_REF_CLOCK_READY());
 
+   //      Reset our state fields to match the initial state of the the timer and our logic.  This step is
+   // useful for applications that may re-initialize the tick by calling this function without a full reset.
+   //
+   isCmpWriteInProgress = pdFALSE;
+   isTickNowSuppressed = pdFALSE;
+
    //      Calculate the constants required to configure the tick interrupt.
    //
    ulTimerCountsForOneTick = ( LPTIM_CLOCK_HZ + ( configTICK_RATE_HZ / 2 ) ) / configTICK_RATE_HZ;
