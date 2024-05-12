@@ -5,6 +5,24 @@
 #include "task.h"
 #include "ulp.h"
 
+// Use of MSI as the clock source for the PLL
+//
+//      An ultra-low-power application that uses MSI as the clock source for the PLL must ensure that the MSI
+// frequency is compatible with the flash wait-state and core-voltage regulator configurations as if MSI were
+// providing the core clock directly.  In these applications, MSI does provide the core clock directly for a
+// short time after waking from stop mode.  This is typically not an issue because the PLL is typically set
+// for a frequency faster than its incoming MSI frequency.
+
+// Warning about HSE and Stop modes
+//
+//      An ultra-low-power application that uses HSE should use it only when needed, and should avoid the use
+// of stop modes while HSE is in use.  This advice applies even if HSE is used in bypass mode.  An easy way to
+// avoid stop modes while HSE is in use is to register it as a peripheral not safe for stop modes.  See
+// ulpPERIPHERAL_HSE in ulp.h for example.
+//
+//      This implementation of ULP assumes the application follows the advice above.  The clock configuration
+// that doesn't use HSE is considered the ULP-friendly clock configuration.
+
 void vUlpInit()
 {
    #ifdef configMIN_RUN_BETWEEN_DEEP_SLEEPS    // Errata workaround
@@ -35,6 +53,32 @@ void vUlpInit()
    else if ( (RCC->CFGR & RCC_CFGR_SWS_Msk) == RCC_CFGR_SWS_MSI )
    {
       CLEAR_BIT(RCC->CFGR, RCC_CFGR_STOPWUCK);
+   }
+   else
+   {
+      //     An assertion failure here means the application has called vUlpInit() while HSE is providing the
+      // core clock.  The application must call vUlpInit() while the ULP-friendly clock configuration is in
+      // place.  See "Warning about HSE and Stop modes" above for more information.
+      //
+      configASSERT( (RCC->CFGR & RCC_CFGR_SWS_Msk) == RCC_CFGR_SWS_PLL );
+
+      //      The application has selected the PLL as the system clock.  In this case, we optimize the
+      // wake-up timing by configuring the MCU to wake from the source clock for the PLL (MSI or HSI).
+      //
+      if ( (RCC->PLLCFGR & RCC_PLLCFGR_PLLSRC_Msk) == RCC_PLLCFGR_PLLSRC_HSI )
+      {
+         SET_BIT(RCC->CFGR, RCC_CFGR_STOPWUCK);
+      }
+      else
+      {
+         CLEAR_BIT(RCC->CFGR, RCC_CFGR_STOPWUCK);
+
+         //      An assertion failure here means the application has called vUlpInit() while HSE is providing
+         // the input clock to the PLL.  The application must call vUlpInit() while the ULP-friendly clock
+         // configuration is in place.  See "Warning about HSE and Stop modes" above for more information.
+         //
+         configASSERT( (RCC->PLLCFGR & RCC_PLLCFGR_PLLSRC_Msk) == RCC_PLLCFGR_PLLSRC_MSI );
+      }
    }
 }
 
@@ -121,7 +165,7 @@ void vUlpPostSleepProcessing()
       //      We may have been in deep sleep.  If we were, the hardware cleared several enable bits in the CR,
       // and it changed the selected system clock in CFGR.  Restore them now.  If we're restarting the PLL as
       // the CPU clock here, the CPU will not wait for it.  Instead, the CPU continues executing from the
-      // wake-up clock (MSI in our case) until the PLL is stable and then the CPU starts using the PLL.
+      // wake-up clock (MSI or HSI) until the PLL is stable and then the CPU starts using the PLL.
       //
       RCC->CR = rccCrSave;
       RCC->CFGR = rccCfgrSave;
