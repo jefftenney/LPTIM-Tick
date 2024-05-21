@@ -235,7 +235,8 @@ static void syncTo( const timeStampT* ts )
 static void analyzeTickTiming( const timeStampT* ts, const timeStampT* refTs )
 {
    uint32_t elapsedTicks = ts->tickCount - refTs->tickCount;
-   uint32_t elapsedTicksAsSubseconds = ( (uint64_t)elapsedTicks * config.subsecondsPerSecond ) / configTICK_RATE_HZ;
+   uint32_t elapsedTicksAsSubseconds = ( (uint64_t)elapsedTicks * config.subsecondsPerSecond + configTICK_RATE_HZ/2 )
+                                       / configTICK_RATE_HZ;
 
    int32_t elapsedRtcSeconds = ( ts->rtcTotalSeconds - refTs->rtcTotalSeconds );
    if (elapsedRtcSeconds < 0)
