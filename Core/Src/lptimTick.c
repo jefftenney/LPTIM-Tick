@@ -759,9 +759,10 @@ void LPTIM_IRQHandler( void )
          isCmpWriteInProgress = pdTRUE;
       }
 
-      //      Tell the OS about the tick.  We don't need to bother saving and restoring the current BASEPRI
-      // setting because (1) we cannot possibly already be in a critical section and (2) the NVIC won't take
-      // interrupts of lower priority than LPTIM even when we set BASEPRI to zero until our ISR ends.
+      //      Tell the OS about the tick.  We don't need to bother saving and restoring the current interrupt
+      // mask (ie, BASEPRI or PRIMASK) because (1) we cannot possibly already be in a critical section and
+      // (2) the NVIC won't allow interrupts of lower priority to preempt the LPTIM ISR, even when we set the
+      // interrupt mask to zero.
       //
       portDISABLE_INTERRUPTS();
       BaseType_t xWasHigherPriorityTaskWoken = xTaskIncrementTick();
