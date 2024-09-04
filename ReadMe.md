@@ -55,3 +55,8 @@ __Tickless disabled (`configUSE_TICKLESS_IDLE 0`)__
 1. Update the LPTIM [instance selection](https://github.com/jefftenney/LPTIM-Tick/blob/5ca1c2ee5878479d2c5c1bac3c8f6a6ae2dea7eb/Core/Src/lptimTick.c#L255-L257).  (For STM32WL users, [here](https://github.com/jefftenney/LPTIM-Tick/blob/5ca1c2ee5878479d2c5c1bac3c8f6a6ae2dea7eb/Core/Src/lptimTick.c#L289) too.)  LPTIM1 is the default.
 1. Update the [initialization code](https://github.com/jefftenney/LPTIM-Tick/blob/5ca1c2ee5878479d2c5c1bac3c8f6a6ae2dea7eb/Core/Src/lptimTick.c#L275-L279) that is specific to both the MCU family and the LPTIM instance.
 
+---
+
+## Application Requirements
+
+1. You must ensure that no combination of your application's interrupt handlers and your code in `configPOST_SLEEP_PROCESSING()` can delay the tick ISR more than one tick period.  To help your application meet this requirement, consider setting `configTICK_INTERRUPT_PRIORITY` to `configLIBRARY_MAX_SYSCALL_INTERRUPT_PRIORITY`, and make sure to implement `configPOST_SLEEP_PROCESSING()` so it executes quickly.  See [vUlpPostSleepProcessing()](https://github.com/jefftenney/LPTIM-Tick/blob/4caa6b997983a834a11a7aa87f217efa9cdbfb5b/Core/Src/ulp.c#L145) for an example.
