@@ -519,7 +519,7 @@ void vPortSuppressTicksAndSleep( TickType_t xExpectedIdleTime )
       //      We identify that we reached the end of the expected idle time by noting that the tick ISR has
       // modified usIdealCmp.  So if it hasn't, then we probably have to reschedule the next tick as described
       // above.  We temporarily mask the tick interrupt while we make the assessment and manipulate usIdealCmp
-      // (and CCR1) if necessary.  We temporarily mask other interrupts so they can't cause us to reschedule
+      // (and CMP) if necessary.  We temporarily mask other interrupts so they can't cause us to reschedule
       // the next tick in the past.
       //
       portDISABLE_INTERRUPTS();
