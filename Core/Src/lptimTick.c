@@ -2,7 +2,7 @@
 //
 // STM32 No-Drift FreeRTOS Tick/Tickless via LPTIM
 //
-// Revision: 2021.11.23
+// Revision: 2025.06.xx
 // Tabs: None
 // Columns: 110
 // Compiler: gcc (GNU) / armcc (Arm-Keil) / iccarm (IAR)
@@ -654,6 +654,31 @@ void vPortSuppressTicksAndSleep( TickType_t xExpectedIdleTime )
 //
 void LPTIM_IRQHandler( void )
 {
+   //      Check for the CMPOK interrupt before checking for a compare match (CMPM).  The CMP synchronization
+   // mechanism can cause us to miss CMPM events, so we always look for a missed CMPM event *after* the sync
+   // mechanism finishes.
+   //
+   if (LPTIM->ISR & LPTIM_ISR_CMPOK)
+   {
+      //      Acknowledge and clear the CMPOK event.
+      //
+      LPTIM->ICR = LPTIM_ICR_CMPOKCF;
+
+      //      If there is a "pending" write operation to CMP, do it now.  Otherwise, make note that the write
+      // is now complete.  Remember to watch for CMP set to 0 when usIdealCmp is 0xFFFF.  There's no pending
+      // write in that case.
+      //
+      if ((uint16_t)(LPTIM->CMP - usIdealCmp) > 1UL)
+      {
+         LPTIM->CMP = usIdealCmp == 0xFFFF ? 0 : usIdealCmp; // never write 0xFFFF to CMP (HW rule)
+         // isCmpWriteInProgress = pdTRUE;  // already true here in the handler for write completed
+      }
+      else
+      {
+         isCmpWriteInProgress = pdFALSE;
+      }
+   }
+
    //      Whether we are running this ISR for a CMPOK interrupt or a CMPM interrupt (or both), we need to see
    // if it's time for a tick.  Think of it as interrupt-induced polling.  The synchronization mechanism that
    // controls writes to CMP can cause us to miss CMPM events or to delay them while we wait to write the new
@@ -773,32 +798,6 @@ void LPTIM_IRQHandler( void )
       portENABLE_INTERRUPTS();
 
       portYIELD_FROM_ISR(xWasHigherPriorityTaskWoken);
-   }
-
-
-   //      Now that we've given as much time as possible for any CMP write to be finished, see if it has
-   // finished.  We may have a new value to write after handling CMPM above.  Handling CMPOK last in this ISR
-   // isn't very important, but it is a slight optimization over other ordering.
-   //
-   if (LPTIM->ISR & LPTIM_ISR_CMPOK)
-   {
-      //      Acknowledge and clear the CMPOK event.
-      //
-      LPTIM->ICR = LPTIM_ICR_CMPOKCF;
-
-      //      If there is a "pending" write operation to CMP, do it now.  Otherwise, make note that the write
-      // is now complete.  Remember to watch for CMP set to 0 when usIdealCmp is 0xFFFF.  There's no pending
-      // write in that case.
-      //
-      if ((uint16_t)(LPTIM->CMP - usIdealCmp) > 1UL)
-      {
-         LPTIM->CMP = usIdealCmp == 0xFFFF ? 0 : usIdealCmp; // never write 0xFFFF to CMP (HW rule)
-         // isCmpWriteInProgress = pdTRUE;  // already true here in the handler for write completed
-      }
-      else
-      {
-         isCmpWriteInProgress = pdFALSE;
-      }
    }
 }
 
