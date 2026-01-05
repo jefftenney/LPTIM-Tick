@@ -2,14 +2,14 @@
 //
 // STM32 No-Drift FreeRTOS Tick/Tickless via LPTIM
 //
-// Revision: 2025.06.xx
+// Revision: 2026.01.05
 // Tabs: None
 // Columns: 110
 // Compiler: gcc (GNU) / armcc (Arm-Keil) / iccarm (IAR)
 // SPDX-License-Identifier: MIT
 
 
-// Copyright 2021 Jeff Tenney <jeff.tenney@gmail.com>
+// Copyright 2026 Jeff Tenney <jeff.tenney@gmail.com>
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy of this software and
 // associated documentation files (the "Software"), to deal in the Software without restriction, including
